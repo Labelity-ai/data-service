@@ -47,11 +47,5 @@ class AnnotationsService:
 
     @staticmethod
     async def delete_annotations(id: ObjectId, project_id: ObjectId):
-        annotations = await engine.find_one(
-            ImageAnnotations,
-            (ImageAnnotations.id == id) & (ImageAnnotations.project_id == project_id))
-
-        if annotations is None:
-            raise HTTPException(404)
-
+        annotations = await AnnotationsService.get_annotations_by_id(id, project_id)
         await engine.delete(annotations)
