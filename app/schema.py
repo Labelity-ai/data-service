@@ -35,6 +35,15 @@ class ProjectPostSchema(SchemaBase):
     description: str
 
 
+class DatasetPostSchema(SchemaBase):
+    name: str
+    description: str
+
+
+class DatasetGetSortQuery(Enum):
+    NAME = 'name'
+
+
 class QueryOperator(Enum):
     EQUALS = '='
     LESSER = '<'
