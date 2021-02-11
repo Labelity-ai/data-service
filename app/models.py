@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, Tuple, Union, List
 import enum
 from datetime import datetime
 
-from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine, Reference
+from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import validator
 
@@ -158,7 +158,7 @@ class User(ModelBase):
 class Project(ModelBase):
     name: str
     description: str
-    user: User = Reference()
+    user_id: ObjectId
 
 
 client = AsyncIOMotorClient(Config.MONGO_HOST)

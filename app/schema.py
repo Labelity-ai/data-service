@@ -1,6 +1,6 @@
-from typing import List
-from functools import partial
+from typing import List, Union
 from enum import Enum
+from functools import partial
 from pydantic import BaseModel
 from fastapi_utils.camelcase import snake2camel
 
@@ -30,7 +30,34 @@ class ImageAnnotationsPostSchema(SchemaBase):
         json_dumps = json_dumps
 
 
-class AnnotationsFormat(Enum):
-    CVAT_XML = 'CVAT_XML'
-    COCO = 'COCO'
-    LABELME = 'LABELME_3.0'
+class ProjectPostSchema(SchemaBase):
+    name: str
+    description: str
+
+
+class QueryOperator(Enum):
+    EQUALS = '='
+    LESSER = '<'
+    GREATER = '>'
+    GREATER_EQUALS = '>='
+    LESSER_EQUALS = '<='
+    NULL = 'is_null'
+    NOT_NULL = 'not_null'
+    CONTAINS = 'contains'
+    IN = 'in'
+
+
+class QueryCombinator(Enum):
+    OR = 'or'
+    AND = 'and'
+
+
+class QueryRule:
+    field: str
+    value: Union[str, int, float, bool]
+    operator: QueryOperator
+
+
+class AnnotationsQuery(SchemaBase):
+    rules: List[Union[QueryRule, 'AnnotationsQuery']]
+    combinator: QueryCombinator
