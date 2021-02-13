@@ -1,10 +1,12 @@
 from typing import List
+from pathlib import Path
 
 from fastapi import HTTPException
 from odmantic import ObjectId
 
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQuery
 from app.models import ImageAnnotations, engine
+from app.core.importers import DatasetImportFormat, import_dataset
 
 
 class AnnotationsService:
@@ -49,3 +51,10 @@ class AnnotationsService:
     async def delete_annotations(id: ObjectId, project_id: ObjectId):
         annotations = await AnnotationsService.get_annotations_by_id(id, project_id)
         await engine.delete(annotations)
+
+    @staticmethod
+    async def add_annotations_file(file: Path,
+                                   annotations_format: DatasetImportFormat,
+                                   project_id: ObjectId):
+        annotations = import_dataset(file, annotations_format)
+        engine.save_all(annotations)
