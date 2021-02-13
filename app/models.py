@@ -1,5 +1,6 @@
 from typing import Optional, Dict, Any, Tuple, Union, List
 import enum
+from collections import defaultdict
 from datetime import datetime
 
 from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
@@ -40,13 +41,13 @@ class Detection(Prediction):
         return box
 
 
-class Keypoint(Prediction):
-    point: Tuple[float, float]
+class Keypoints(Prediction):
+    points: List[float, float]
 
-    @validator('point')
-    def check_points(cls, point):
-        check_relative_points(point)
-        return point
+    @validator('points')
+    def check_points(cls, points):
+        check_relative_points(points)
+        return points
 
 
 class Polygon(Prediction):
@@ -77,31 +78,34 @@ class ImageAnnotations(ModelBase):
     event_id: str
     project_id: ObjectId
 
-    points: List[Keypoint] = []
+    points: List[Keypoints] = []
     polylines: List[Polyline] = []
     detections: List[Detection] = []
     polygons: List[Polygon] = []
     tags: List[Tag] = []
+    attributes: dict = {}
+
+    @staticmethod
+    def _extract_labels(objects: List[Prediction], shape: 'Shape', labels: set, attributes):
+        for obj in objects:
+            key = (obj.label, shape)
+            attributes[key].update(obj.attributes.keys())
+            labels.add(key)
 
     def get_labels(self):
         labels = set()
-        # TODO: Infer attributes
-        for point in self.points:
-            labels.add((point.label, Shape.POINT))
+        attributes = defaultdict(set)
 
-        for polygon in self.polygons:
-            labels.add((polygon.label, Shape.POLYGON))
+        self._extract_labels(self.points, Shape.POINT, labels, attributes)
+        self._extract_labels(self.detections, Shape.BOX, labels, attributes)
+        self._extract_labels(self.polygons, Shape.POLYGON, labels, attributes)
+        self._extract_labels(self.polylines, Shape.POLYLINE, labels, attributes)
+        self._extract_labels(self.tags, Shape.TAG, labels, attributes)
 
-        for polyline in self.polylines:
-            labels.add((polyline.label, Shape.POLYLINE))
-
-        for detection in self.detections:
-            labels.add((detection.label, Shape.BOX))
-
-        for tag in self.tags:
-            labels.add((tag.label, Shape.TAG))
-
-        return [Label(name=name, shape=shape, project_id=self.project_id)
+        return [Label(name=name,
+                      shape=shape,
+                      project_id=self.project_id,
+                      attributes=attributes[(name, shape)])
                 for name, shape in labels]
 
 
