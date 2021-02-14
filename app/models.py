@@ -151,6 +151,7 @@ class Project(Model):
     name: str
     description: str
     user_id: ObjectId
+    api_keys: List[str]
 
     class Config:
         json_loads = json_loads
