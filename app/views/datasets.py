@@ -11,7 +11,9 @@ from app.security import get_project_id
 from app.config import Config
 from app.services.datasets import DatasetService
 
-router = InferringRouter()
+router = InferringRouter(
+    tags=["datasets"],
+)
 
 
 @cbv(router)

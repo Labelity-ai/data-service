@@ -35,37 +35,25 @@ class Tag(Prediction):
 class Detection(Prediction):
     box: Tuple[float, float, float, float]
 
-    @validator('box')
-    def check_box(cls, box):
-        check_relative_points(box)
-        return box
+    _normalize_box = validator('box', allow_reuse=True)(check_relative_points)
 
 
 class Keypoints(Prediction):
-    points: List[float, float]
+    points: List[float]
 
-    @validator('points')
-    def check_points(cls, points):
-        check_relative_points(points)
-        return points
+    _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
 class Polygon(Prediction):
     points: List[Tuple[float, float]]
 
-    @validator('points')
-    def check_points(cls, points):
-        check_relative_points(points)
-        return points
+    _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
 class Polyline(Prediction):
     points: List[Tuple[float, float]]
 
-    @validator('points')
-    def check_points(cls, points):
-        check_relative_points(points)
-        return points
+    _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
 class ModelBase(Model):
@@ -159,10 +147,14 @@ class User(ModelBase):
     updated_at: datetime
 
 
-class Project(ModelBase):
+class Project(Model):
     name: str
     description: str
     user_id: ObjectId
+
+    class Config:
+        json_loads = json_loads
+        json_dumps = json_dumps
 
 
 client = AsyncIOMotorClient(Config.MONGO_HOST)
