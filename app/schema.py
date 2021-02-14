@@ -61,7 +61,7 @@ class QueryCombinator(Enum):
     AND = 'and'
 
 
-class QueryRule:
+class QueryRule(SchemaBase):
     field: str
     value: Union[str, int, float, bool]
     operator: QueryOperator

@@ -17,7 +17,9 @@ from app.utils import json_loads
 from app.core.importers import DatasetImportFormat
 
 
-router = InferringRouter()
+router = InferringRouter(
+    tags=["annotations"],
+)
 
 
 @cbv(router)
