@@ -165,5 +165,20 @@ class Project(Model):
     Config = ModelConfig
 
 
+class QueryExpression(EmbeddedModel):
+    field: Optional[str]
+    literal: Union[int, float, str, None]
+    operator: str
+    parameters: Dict[str, Union[float, 'QueryExpression', str]]
+
+    Config = ModelConfig
+
+
+class Pipeline(Model):
+    steps: List[QueryExpression]
+
+    Config = ModelConfig
+
+
 client = AsyncIOMotorClient(Config.MONGO_HOST)
 engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
