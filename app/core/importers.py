@@ -1,7 +1,8 @@
 from enum import Enum
 from datumaro.components.dataset import Dataset, DatasetItem, AnnotationType
 from pathlib import Path
-from app.models import ImageAnnotations, Tag, Polygon, Detection, Polyline, Keypoints
+from app.models import ImageAnnotations, Tag, Polygon, Detection,\
+    Polyline, Keypoints, ObjectId
 
 
 class DatasetImportFormat(Enum):
@@ -29,8 +30,8 @@ def _normalize_points(points, item: DatasetItem):
     return result
 
 
-def import_dataset(input_file: Path, format: DatasetImportFormat):
-    dataset = Dataset.import_from(input_file, format=format)
+def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: ObjectId):
+    dataset = Dataset.import_from(input_file, format=format.value)
     labels = dataset.categories()
     annotations = []
 
@@ -79,6 +80,7 @@ def import_dataset(input_file: Path, format: DatasetImportFormat):
             detections=detections,
             polylines=polylines,
             points=points,
+            project_id=project_id
         )
 
         annotations.append(image_annotations)
