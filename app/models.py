@@ -18,14 +18,17 @@ def check_relative_points(values: List[float]):
     return values
 
 
+class ModelConfig:
+    json_loads = json_loads
+    json_dumps = json_dumps
+
+
 class Prediction(EmbeddedModel):
     label: str
     score: Optional[float] = None
     attributes: Dict[str, Any] = {}
 
-    class Config:
-        json_loads = json_loads
-        json_dumps = json_dumps
+    Config = ModelConfig
 
 
 class Tag(Prediction):
@@ -56,13 +59,7 @@ class Polyline(Prediction):
     _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
-class ModelBase(Model):
-    class Config:
-        json_loads = json_loads
-        json_dumps = json_dumps
-
-
-class ImageAnnotations(ModelBase):
+class ImageAnnotations(Model):
     event_id: str
     project_id: ObjectId
 
@@ -96,6 +93,8 @@ class ImageAnnotations(ModelBase):
                       attributes=attributes[(name, shape)])
                 for name, shape in labels]
 
+    Config = ModelConfig
+
 
 class Shape(enum.Enum):
     BOX = 'box'
@@ -123,21 +122,25 @@ class Attribute(EmbeddedModel):
         json_dumps = json_dumps
 
 
-class Label(ModelBase):
+class Label(Model):
     name: str
     shape: Shape
     attributes: List[Attribute]
     project_id: ObjectId
 
+    Config = ModelConfig
 
-class Dataset(ModelBase):
+
+class Dataset(Model):
     name: str
     description: str
     annotations: List[ObjectId]
     project_id: ObjectId
 
+    Config = ModelConfig
 
-class User(ModelBase):
+
+class User(Model):
     name: str
     email: str
     email_verified: datetime
@@ -146,16 +149,20 @@ class User(ModelBase):
     created_at: datetime
     updated_at: datetime
 
+    Config = ModelConfig
+
+
+class TestUser(Model):
+    pass
+
 
 class Project(Model):
     name: str
     description: str
     user_id: ObjectId
-    api_keys: List[str]
+    api_keys: List[str] = []
 
-    class Config:
-        json_loads = json_loads
-        json_dumps = json_dumps
+    Config = ModelConfig
 
 
 client = AsyncIOMotorClient(Config.MONGO_HOST)

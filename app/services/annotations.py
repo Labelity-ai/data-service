@@ -56,5 +56,5 @@ class AnnotationsService:
     async def add_annotations_file(file: Path,
                                    annotations_format: DatasetImportFormat,
                                    project_id: ObjectId):
-        annotations = import_dataset(file, annotations_format)
-        engine.save_all(annotations)
+        annotations = import_dataset(file, annotations_format, project_id)
+        return await engine.save_all(annotations)
