@@ -161,6 +161,8 @@ class Project(Model):
     description: str
     user_id: ObjectId
     api_keys: List[str] = []
+    attributes: List[str] = []
+    labels: List[Label] = []
 
     Config = ModelConfig
 
