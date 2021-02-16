@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Dict, Optional
 from enum import Enum
 from functools import partial
 from pydantic import BaseModel
@@ -42,31 +42,3 @@ class DatasetPostSchema(SchemaBase):
 
 class DatasetGetSortQuery(Enum):
     NAME = 'name'
-
-
-class QueryOperator(Enum):
-    EQUALS = '='
-    LESSER = '<'
-    GREATER = '>'
-    GREATER_EQUALS = '>='
-    LESSER_EQUALS = '<='
-    NULL = 'is_null'
-    NOT_NULL = 'not_null'
-    CONTAINS = 'contains'
-    IN = 'in'
-
-
-class QueryCombinator(Enum):
-    OR = 'or'
-    AND = 'and'
-
-
-class QueryRule(SchemaBase):
-    field: str
-    value: Union[str, int, float, bool]
-    operator: QueryOperator
-
-
-class AnnotationsQuery(SchemaBase):
-    rules: List[Union[QueryRule, 'AnnotationsQuery']]
-    combinator: QueryCombinator
