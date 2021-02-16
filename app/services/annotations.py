@@ -4,8 +4,8 @@ from pathlib import Path
 from fastapi import HTTPException
 from odmantic import ObjectId
 
-from app.schema import ImageAnnotationsPostSchema, AnnotationsQuery
-from app.models import ImageAnnotations, engine
+from app.schema import ImageAnnotationsPostSchema
+from app.models import ImageAnnotations, QueryStage, engine
 from app.core.importers import DatasetImportFormat, import_dataset
 
 
@@ -22,8 +22,7 @@ class AnnotationsService:
         return annotations
 
     @staticmethod
-    async def get_annotations(query: AnnotationsQuery, project_id: ObjectId) -> List[ImageAnnotations]:
-        # TODO
+    async def run_annotations_pipeline(query: List[QueryStage], project_id: ObjectId) -> List[ImageAnnotations]:
         return []
 
     @staticmethod
