@@ -174,8 +174,14 @@ class QueryExpression(EmbeddedModel):
     Config = ModelConfig
 
 
-class Pipeline(Model):
-    steps: List[QueryExpression]
+class QueryStage(EmbeddedModel):
+    kind: str
+    parameters: Dict
+
+
+class QueryPipeline(Model):
+    steps: List[QueryStage]
+    created_at: datetime
 
     Config = ModelConfig
 
