@@ -8,8 +8,8 @@ from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, File, UploadFile
 from odmantic import ObjectId
 
-from app.schema import ImageAnnotationsPostSchema, AnnotationsQuery
-from app.models import ImageAnnotations
+from app.schema import ImageAnnotationsPostSchema
+from app.models import ImageAnnotations, QueryStage
 from app.security import get_project_id
 from app.config import Config
 from app.services.annotations import AnnotationsService
@@ -30,15 +30,9 @@ class AnnotationsView:
     async def get_annotations_by_id(self, id: ObjectId) -> ImageAnnotations:
         return await AnnotationsService.get_annotations_by_id(id, self.project_id)
 
-    @router.get("/annotations")
-    async def get_annotations(self, query: str) -> List[ImageAnnotations]:
-        try:
-            query_json = json_loads(query)
-        except Exception:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, 'The query field should be a valid JSON')
-
-        query_obj = AnnotationsQuery(**query_json)
-        return await AnnotationsService.get_annotations(query_obj, self.project_id)
+    @router.post("/annotations/pipeline")
+    async def run_annotations_pipeline(self, query: List[QueryStage]) -> List[ImageAnnotations]:
+        return await AnnotationsService.run_annotations_pipeline(query, self.project_id)
 
     @router.post("/annotations")
     async def add_annotations(self, annotation: ImageAnnotationsPostSchema) -> ImageAnnotations:
