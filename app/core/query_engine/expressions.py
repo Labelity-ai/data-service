@@ -3068,6 +3068,10 @@ class ViewExpression(object):
 
         return ViewExpression({"$zip": zip_expr})
 
+    @property
+    def expr(self):
+        return self._expr
+
 
 class ViewField(ViewExpression):
     """A :class:`ViewExpression` that refers to a field or embedded field of a
