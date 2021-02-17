@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Dict
+from typing import List, Optional, Union, Dict, Any
 import random
 from datetime import datetime
 
@@ -35,7 +35,7 @@ def _get_annotations_field(shape: Shape):
 
 class QueryStage(EmbeddedModel):
     stage: str
-    parameters: Dict
+    parameters: Dict[str, Any]
 
     @root_validator
     def validate_root(cls, values):

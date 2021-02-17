@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
+from fastapi_utils.api_model import APIMessage
 from fastapi import Depends
 from odmantic import ObjectId
 
@@ -16,10 +17,14 @@ router = InferringRouter(
 )
 
 
+def testing_user():
+    return TestUser(id='602a2960ec631e386e1848a6')
+
+
 @cbv(router)
 class ProjectsView:
     # user: User = Depends(get_current_active_user)
-    user: TestUser = TestUser(id='602a2960ec631e386e1848a6')
+    user: TestUser = Depends(testing_user)
 
     @router.get("/project/{id}")
     async def get_project_by_id(self, id: ObjectId) -> Project:
@@ -38,8 +43,9 @@ class ProjectsView:
         return await ProjectService.update_project(id, project, self.user.id)
 
     @router.delete("/dataset/{id}")
-    async def delete_project(self, id: ObjectId):
-        return await ProjectService.delete_project(id, self.user.id)
+    async def delete_project(self, id: ObjectId) -> APIMessage:
+        await ProjectService.delete_project(id, self.user.id)
+        return APIMessage(detail=f"Deleted project {id}")
 
     @router.get("/project/{id}/labels")
     async def get_project_labels(self, id: ObjectId) -> List[Label]:
