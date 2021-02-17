@@ -69,6 +69,7 @@ class ImageAnnotations(Model):
     polygons: List[Polygon] = []
     tags: List[Tag] = []
     attributes: dict = {}
+    _labels: List['Label']
 
     @staticmethod
     def _extract_labels(objects: List[Prediction], shape: 'Shape', labels: set, attributes):
@@ -90,7 +91,7 @@ class ImageAnnotations(Model):
         return [Label(name=name,
                       shape=shape,
                       project_id=self.project_id,
-                      attributes=attributes[(name, shape)])
+                      attributes=list(attributes[(name, shape)]))
                 for name, shape in labels]
 
     Config = ModelConfig
@@ -104,29 +105,10 @@ class Shape(enum.Enum):
     POLYLINE = 'polyline'
 
 
-class AttributeType(enum.Enum):
-    TEXT = 'TEXT'
-    SELECT = 'SELECT'
-    RADIO = 'RADIO'
-    CHECKBOX = 'CHECKBOX'
-    NUMBER = 'NUMBER'
-
-
-class Attribute(EmbeddedModel):
-    name: str
-    type: AttributeType
-    value: List[str]
-
-    class Config:
-        json_loads = json_loads
-        json_dumps = json_dumps
-
-
-class Label(Model):
+class Label(EmbeddedModel):
     name: str
     shape: Shape
-    attributes: List[Attribute]
-    project_id: ObjectId
+    attributes: List[str]
 
     Config = ModelConfig
 
@@ -162,7 +144,6 @@ class Project(Model):
     user_id: ObjectId
     api_keys: List[str] = []
     attributes: List[str] = []
-    labels: List[Label] = []
 
     Config = ModelConfig
 
@@ -172,18 +153,6 @@ class QueryExpression(EmbeddedModel):
     literal: Union[int, float, str, None]
     operator: str
     parameters: Dict[str, Union[float, 'QueryExpression', str]]
-
-    Config = ModelConfig
-
-
-class QueryStage(EmbeddedModel):
-    kind: str
-    parameters: Dict
-
-
-class QueryPipeline(Model):
-    steps: List[QueryStage]
-    created_at: datetime
 
     Config = ModelConfig
 

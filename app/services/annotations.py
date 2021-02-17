@@ -5,8 +5,9 @@ from fastapi import HTTPException
 from odmantic import ObjectId
 
 from app.schema import ImageAnnotationsPostSchema
-from app.models import ImageAnnotations, QueryStage, engine
+from app.models import ImageAnnotations, Project, engine
 from app.core.importers import DatasetImportFormat, import_dataset
+from app.core.query_engine.stages import STAGES, QueryStage
 
 
 class AnnotationsService:
@@ -22,8 +23,19 @@ class AnnotationsService:
         return annotations
 
     @staticmethod
-    async def run_annotations_pipeline(query: List[QueryStage], project_id: ObjectId) -> List[ImageAnnotations]:
-        return []
+    async def run_annotations_pipeline(query: List[QueryStage], project: Project) -> List[ImageAnnotations]:
+        pipeline = [{'$match': {'project_id': project.id}}]
+
+        for step in query:
+            try:
+                stage = STAGES[step.stage](**step.parameters)
+                stage.validate_stage(project)
+                pipeline.append(stage.to_mongo())
+            except ValueError as error:
+                raise HTTPException(400, detail=error)
+
+        collection = engine.get_collection(ImageAnnotations)
+        return await collection.aggregate(pipeline).to_list(length=None)
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema, project_id: ObjectId) -> ImageAnnotations:
