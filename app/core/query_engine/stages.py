@@ -1,11 +1,14 @@
 from typing import List, Optional, Union, Dict
 import random
+from datetime import datetime
 
 from pymongo import ASCENDING, DESCENDING
 
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
-from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations, Project, Shape
+from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations,\
+    Project, Shape, Model, ModelConfig, Label
+from pydantic import root_validator
 
 
 def _get_random_generator(seed):
@@ -30,12 +33,34 @@ def _get_annotations_field(shape: Shape):
         return 'polylines'
 
 
+class QueryStage(EmbeddedModel):
+    stage: str
+    parameters: Dict
+
+    @root_validator
+    def validate_root(cls, values):
+        stage = values['stage']
+
+        if stage not in STAGES:
+            raise ValueError(f'Stage {stage} is not a supported type')
+
+
+class QueryPipeline(Model):
+    steps: List[QueryStage]
+    created_at: datetime
+
+    Config = ModelConfig
+
+
 class Exclude(EmbeddedModel):
     samples: List[ObjectId]
 
     def to_mongo(self):
         expr = ~ViewField('_id').is_in(self.samples)
         return [{'$match': expr.to_mongo()}]
+
+    def validate_stage(self, *_, **__):
+        pass
 
 
 class Exists(EmbeddedModel):
@@ -50,6 +75,9 @@ class Exists(EmbeddedModel):
 
         return [{"$match": expr}]
 
+    def validate_stage(self, *_, **__):
+        pass
+
 
 class Limit(EmbeddedModel):
     limit: int
@@ -59,6 +87,9 @@ class Limit(EmbeddedModel):
             return [{"$match": {"_id": None}}]
 
         return [{"$limit": self.limit}]
+
+    def validate_stage(self, *_, **__):
+        pass
 
 
 class Skip(EmbeddedModel):
@@ -88,6 +119,9 @@ class Take(EmbeddedModel):
             {"$unset": "_rand_take"},
         ]
 
+    def validate_stage(self, *_, **__):
+        pass
+
 
 class Match(EmbeddedModel):
     filter: QueryExpression
@@ -95,6 +129,9 @@ class Match(EmbeddedModel):
     def to_mongo(self):
         expr = construct_view_expression(self.filter)
         return [{"$match": expr.to_mongo()}]
+
+    def validate_stage(self, *_, **__):
+        pass
 
 
 class Shuffle(EmbeddedModel):
@@ -109,6 +146,9 @@ class Shuffle(EmbeddedModel):
             {"$unset": "_rand_shuffle"},
         ]
 
+    def validate_stage(self, *_, **__):
+        pass
+
 
 class Select(EmbeddedModel):
     samples: List[ObjectId]
@@ -117,6 +157,9 @@ class Select(EmbeddedModel):
         expr = ViewField('_id').is_in(self.samples)
         return [{"$match": expr.to_mongo()}]
 
+    def validate_stage(self, *_, **__):
+        pass
+
 
 class MatchTags(EmbeddedModel):
     tags: List[str]
@@ -124,6 +167,9 @@ class MatchTags(EmbeddedModel):
     def to_mongo(self):
         expr = ViewField('tags').is_in(self.tags)
         return [{"$match": expr.to_mongo()}]
+
+    def validate_stage(self, *_, **__):
+        pass
 
 
 class MapLabels(EmbeddedModel):
@@ -139,8 +185,8 @@ class MapLabels(EmbeddedModel):
 
         return [{'$set': {field: expression.to_mongo()}}]
 
-    def validate(self, project: Project):
-        mapping = {(label.name, label.shape) for label in project.labels}
+    def validate_stage(self, project_labels: List[Label], **_):
+        mapping = {(label.name, label.shape) for label in project_labels}
         for label in self.mapping.keys():
             if (label, self.shape) not in mapping:
                 raise ValueError(f'Label {label} with shape {self.shape} not found in project task')
@@ -157,8 +203,8 @@ class SelectLabels(EmbeddedModel):
         filter_labels = FilterLabels(shape=self.shape, filter=ViewField('label').is_in(self.labels))
         return filter_labels.to_mongo()
 
-    def validate(self, project: Project):
-        mapping = {(label.name, label.shape) for label in project.labels}
+    def validate_stage(self, project_labels: List[Label], **_):
+        mapping = {(label.name, label.shape) for label in project_labels}
 
         for label in self.labels:
             if (label, self.shape) not in mapping:
@@ -174,7 +220,7 @@ class FilterLabels(EmbeddedModel):
         filter_expr = construct_view_expression(self.filter)
         return [{"$project": {field: ViewField(f'${field}').filter(filter_expr)}}]
 
-    def validate(self, project: Project):
+    def validate_stage(self, *_, **__):
         pass
 
 
@@ -189,8 +235,8 @@ class ExcludeLabels(EmbeddedModel):
         filter_labels = FilterLabels(shape=self.shape, filter=~ViewField('label').is_in(self.labels))
         return filter_labels.to_mongo()
 
-    def validate(self, project: Project):
-        mapping = {(label.name, label.shape) for label in project.labels}
+    def validate_stage(self, project_labels: List[Label], **_):
+        mapping = {(label.name, label.shape) for label in project_labels}
 
         for label in self.labels:
             if (label, self.shape) not in mapping:
@@ -203,8 +249,9 @@ class SelectAttributes(EmbeddedModel):
     def to_mongo(self):
         return FilterAttributes(attributes=self.attributes, filter=ViewExpression(True)).to_mongo()
 
-    def validate(self, project: Project):
-        FilterAttributes(attributes=self.attributes, filter=ViewExpression(True)).validate(project)
+    def validate_stage(self, *args, **kwargs):
+        FilterAttributes(attributes=self.attributes, filter=ViewExpression(True))\
+            .validate_stage(*args, **kwargs)
 
 
 class ExcludeAttributes(EmbeddedModel):
@@ -213,8 +260,9 @@ class ExcludeAttributes(EmbeddedModel):
     def to_mongo(self):
         return FilterAttributes(attributes=self.attributes, filter=ViewExpression(False)).to_mongo()
 
-    def validate(self, project: Project):
-        FilterAttributes(attributes=self.attributes, filter=ViewExpression(False)).validate(project)
+    def validate_stage(self, *args, **kwargs):
+        FilterAttributes(attributes=self.attributes, filter=ViewExpression(False))\
+            .validate_stage(*args, **kwargs)
 
 
 class FilterAttributes(EmbeddedModel):
@@ -228,9 +276,9 @@ class FilterAttributes(EmbeddedModel):
         filter_expr = construct_view_expression(self.filter).to_mongo()
         return {"$project": {f'attributes.{attribute}': filter_expr for attribute in self.attributes}}
 
-    def validate(self, project: Project):
+    def validate_stage(self, project_attributes: List[str], **_):
         for field in self.attributes:
-            if field not in project.attributes:
+            if field not in project_attributes:
                 raise ValueError('Field not found in project attributes')
 
 
@@ -262,7 +310,7 @@ class SortBy(EmbeddedModel):
         elif isinstance(expression, ViewExpression):
             return expression.to_mongo()
 
-    def validate(self, sample_collection):
+    def validate_stage(self, project_attributes: List[str], project_labels: List[Label]):
         field_or_expr = self._get_mongo_field_or_expr()
 
         if isinstance(field_or_expr, str):
@@ -296,6 +344,9 @@ class LimitLabels(EmbeddedModel):
             }
         }]
 
+    def validate_stage(self, *_, **__):
+        pass
+
 
 class SetAttribute(EmbeddedModel):
     attribute: str
@@ -312,9 +363,9 @@ class SetAttribute(EmbeddedModel):
         # TODO: Add support for label attributes
         return [{'$set': {f'{+ImageAnnotations.attributes}.{self.attribute}': expression}}]
 
-    def validate(self, project: Project):
+    def validate_stage(self, project_attributes: List[str], **_):
         # TODO: Add support for nested fields
-        if self.attribute not in project.attributes:
+        if self.attribute not in project_attributes:
             raise ValueError('Field not found in project attributes')
 
 
