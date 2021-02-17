@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, Dict, Any, Tuple, Union, List
 import enum
 from collections import defaultdict
@@ -5,7 +6,7 @@ from datetime import datetime
 
 from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import validator
+from pydantic import validator, BaseModel
 
 from app.utils import json_loads, json_dumps
 from app.config import Config
@@ -59,6 +60,22 @@ class Polyline(Prediction):
     _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
+class Shape(enum.Enum):
+    BOX = 'box'
+    TAG = 'tag'
+    POINT = 'point'
+    POLYGON = 'polygon'
+    POLYLINE = 'polyline'
+
+
+class Label(EmbeddedModel):
+    name: str
+    shape: Shape
+    attributes: List[str]
+
+    Config = ModelConfig
+
+
 class ImageAnnotations(Model):
     event_id: str
     project_id: ObjectId
@@ -68,8 +85,8 @@ class ImageAnnotations(Model):
     detections: List[Detection] = []
     polygons: List[Polygon] = []
     tags: List[Tag] = []
-    attributes: dict = {}
-    _labels: List['Label']
+    attributes: Dict[str, Any] = {}
+    labels: List[Label]
 
     @staticmethod
     def _extract_labels(objects: List[Prediction], shape: 'Shape', labels: set, attributes):
@@ -93,22 +110,6 @@ class ImageAnnotations(Model):
                       project_id=self.project_id,
                       attributes=list(attributes[(name, shape)]))
                 for name, shape in labels]
-
-    Config = ModelConfig
-
-
-class Shape(enum.Enum):
-    BOX = 'box'
-    TAG = 'tag'
-    POINT = 'point'
-    POLYGON = 'polygon'
-    POLYLINE = 'polyline'
-
-
-class Label(EmbeddedModel):
-    name: str
-    shape: Shape
-    attributes: List[str]
 
     Config = ModelConfig
 
@@ -148,14 +149,16 @@ class Project(Model):
     Config = ModelConfig
 
 
-class QueryExpression(EmbeddedModel):
+class QueryExpression(BaseModel):
     field: Optional[str]
     literal: Union[int, float, str, None]
     operator: str
-    parameters: Dict[str, Union[float, 'QueryExpression', str]]
+    parameters: Dict[str, Union[float, QueryExpression, str]]
 
     Config = ModelConfig
 
+
+QueryExpression.update_forward_refs()
 
 client = AsyncIOMotorClient(Config.MONGO_HOST)
 engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)

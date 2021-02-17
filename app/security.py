@@ -65,10 +65,10 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 
-async def get_project_id(x_api_key: str = Depends(API_KEY_HEADER),
-                         user: Optional[User] = Depends(get_optional_current_user),
-                         project_id: Optional[str] = Header(None)):
-    return '602a2f0deac5ef687b30ac21'
+async def get_project(x_api_key: str = Depends(API_KEY_HEADER),
+                      user: Optional[User] = Depends(get_optional_current_user),
+                      project_id: Optional[str] = Header(None)):
+    return await engine.find_one(Project, Project.user_id == '602a2f0deac5ef687b30ac21')
 
     if user and project_id:
         project = await engine.find_one(Project, Project.user_id == user.id)
@@ -90,4 +90,4 @@ async def get_project_id(x_api_key: str = Depends(API_KEY_HEADER),
             detail=detail
         )
 
-    return project.id
+    return project

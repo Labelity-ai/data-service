@@ -69,3 +69,16 @@ class AnnotationsService:
                                    project_id: ObjectId):
         annotations = import_dataset(file, annotations_format, project_id)
         return await engine.save_all(annotations)
+
+    @staticmethod
+    def get_stages_schema():
+        result = {}
+
+        for stage_id, stage_class in STAGES.items():
+            print(stage_id)
+            try:
+                result[stage_id] = stage_class.schema()
+            except Exception as e:
+                raise e
+
+        return result

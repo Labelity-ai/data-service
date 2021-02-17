@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from pathlib import Path
 import tempfile
 
@@ -9,12 +9,12 @@ from fastapi import Depends, HTTPException, status, File, UploadFile
 from odmantic import ObjectId
 
 from app.schema import ImageAnnotationsPostSchema
-from app.models import ImageAnnotations, QueryStage
-from app.security import get_project_id
+from app.models import ImageAnnotations, Project
+from app.security import get_project
 from app.config import Config
 from app.services.annotations import AnnotationsService
-from app.utils import json_loads
 from app.core.importers import DatasetImportFormat
+from app.core.query_engine.stages import QueryStage
 
 
 router = InferringRouter(
@@ -24,19 +24,19 @@ router = InferringRouter(
 
 @cbv(router)
 class AnnotationsView:
-    project_id: ObjectId = Depends(get_project_id)
+    project: Project = Depends(get_project)
 
     @router.get("/annotations/{id}")
     async def get_annotations_by_id(self, id: ObjectId) -> ImageAnnotations:
-        return await AnnotationsService.get_annotations_by_id(id, self.project_id)
+        return await AnnotationsService.get_annotations_by_id(id, self.project.id)
 
     @router.post("/annotations/pipeline")
     async def run_annotations_pipeline(self, query: List[QueryStage]) -> List[ImageAnnotations]:
-        return await AnnotationsService.run_annotations_pipeline(query, self.project_id)
+        return await AnnotationsService.run_annotations_pipeline(query, self.project)
 
     @router.post("/annotations")
     async def add_annotations(self, annotation: ImageAnnotationsPostSchema) -> ImageAnnotations:
-        return await AnnotationsService.add_annotations(annotation, self.project_id)
+        return await AnnotationsService.add_annotations(annotation, self.project.id)
 
     @router.post("/annotations_bulk")
     async def add_annotations_bulk(self, annotations: List[ImageAnnotationsPostSchema]) -> List[ImageAnnotations]:
@@ -45,7 +45,7 @@ class AnnotationsView:
                                 f'Payload too large. The maximum number of annotations to be'
                                 f' added in a single request is {Config.POST_BULK_LIMIT}')
 
-        return await AnnotationsService.add_annotations_bulk(annotations, self.project_id)
+        return await AnnotationsService.add_annotations_bulk(annotations, self.project.id)
 
     @router.post("/annotations_file")
     async def add_annotations_file(self,
@@ -63,7 +63,7 @@ class AnnotationsView:
                 temp_file.flush()
                 print(temp_file.name)
                 return await AnnotationsService.add_annotations_file(
-                    Path(temp_file.name), annotations_format, self.project_id)
+                    Path(temp_file.name), annotations_format, self.project.id)
 
     @router.patch("/annotations/{id}")
     async def update_annotations(self, id: ObjectId,
@@ -72,5 +72,9 @@ class AnnotationsView:
 
     @router.delete("/annotations/{id}")
     async def delete_annotations(self, id: ObjectId) -> APIMessage:
-        await AnnotationsService.delete_annotations(id, self.project_id)
+        await AnnotationsService.delete_annotations(id, self.project.id)
         return APIMessage(detail=f"Deleted annotations {id}")
+
+    @router.get("/annotations/meta/stages")
+    def get_annotations_by_id(self) -> Dict[str, dict]:
+        return AnnotationsService.get_stages_schema()

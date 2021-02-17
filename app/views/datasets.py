@@ -6,8 +6,8 @@ from fastapi import Depends, HTTPException, status
 from odmantic import ObjectId
 
 from app.schema import DatasetPostSchema, DatasetGetSortQuery, ImageAnnotationsPostSchema
-from app.models import Dataset, ImageAnnotations, Label
-from app.security import get_project_id
+from app.models import Dataset, ImageAnnotations, Label, Project
+from app.security import get_project
 from app.config import Config
 from app.services.datasets import DatasetService
 
@@ -18,15 +18,15 @@ router = InferringRouter(
 
 @cbv(router)
 class DatasetsView:
-    project_id: ObjectId = Depends(get_project_id)
+    project: Project = Depends(get_project)
 
     @router.get("/dataset/{id}")
     async def get_dataset_by_id(self, id: ObjectId) -> Dataset:
-        return await DatasetService.get_dataset_by_id(id, self.project_id)
+        return await DatasetService.get_dataset_by_id(id, self.project.id)
 
     @router.get("/dataset/{id}/annotations")
     async def get_annotations_by_dataset_id(self, id: ObjectId) -> List[ImageAnnotations]:
-        return await DatasetService.get_annotations_by_dataset_id(id, self.project_id)
+        return await DatasetService.get_annotations_by_dataset_id(id, self.project.id)
 
     @router.post("/dataset/{id}/annotations")
     async def attach_annotations_to_dataset(self, id: ObjectId,
@@ -43,20 +43,21 @@ class DatasetsView:
     @router.get("/dataset")
     async def get_datasets(self, name: DatasetGetSortQuery = None,
                            sort: DatasetGetSortQuery = None) -> List[Dataset]:
-        return await DatasetService.get_datasets(self.project_id, name, sort)
+        return await DatasetService.get_datasets(self.project.id, name, sort)
 
     @router.post("/dataset")
     async def add_dataset(self, dataset: DatasetPostSchema) -> Dataset:
-        return await DatasetService.create_dataset(dataset, self.project_id)
+        return await DatasetService.create_dataset(dataset, self.project.id)
 
     @router.put("/dataset/{id}")
     async def add_dataset(self, id: ObjectId, dataset: DatasetPostSchema) -> Dataset:
-        return await DatasetService.update_dataset(id, dataset, self.project_id)
+        return await DatasetService.update_dataset(id, dataset, self.project.id)
 
     @router.delete("/dataset/{id}")
     async def delete_dataset(self, id: ObjectId) -> Dataset:
-        return await DatasetService.delete_dataset(id, self.project_id)
+        await DatasetService.delete_dataset(id, self.project.id)
+        return APIMessage(detail=f"Deleted dataset {id}")
 
     @router.get("/dataset/{id}/labels")
     async def get_dataset_labels(self, id: ObjectId) -> List[Label]:
-        return await DatasetService.get_dataset_labels(id, self.project_id)
+        return await DatasetService.get_dataset_labels(id, self.project.id)
