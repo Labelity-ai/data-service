@@ -60,7 +60,7 @@ class Polyline(Prediction):
     _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
-class Shape(enum.Enum):
+class Shape(str, enum.Enum):
     BOX = 'box'
     TAG = 'tag'
     POINT = 'point'
@@ -89,7 +89,7 @@ class ImageAnnotations(Model):
     labels: List[Label]
 
     @staticmethod
-    def _extract_labels(objects: List[Prediction], shape: 'Shape', labels: set, attributes):
+    def _extract_labels(objects: List[Prediction], shape: Shape, labels: set, attributes):
         for obj in objects:
             key = (obj.label, shape)
             attributes[key].update(obj.attributes.keys())
