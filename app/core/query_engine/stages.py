@@ -44,6 +44,8 @@ class QueryStage(EmbeddedModel):
         if stage not in STAGES:
             raise ValueError(f'Stage {stage} is not a supported type')
 
+        return values
+
 
 class QueryPipeline(Model):
     steps: List[QueryStage]
@@ -56,8 +58,7 @@ class Exclude(EmbeddedModel):
     samples: List[ObjectId]
 
     def to_mongo(self):
-        expr = ~ViewField('_id').is_in(self.samples)
-        return [{'$match': expr.to_mongo()}]
+        return [{'$match': {'_id': {'$not': {'$in': self.samples}}}}]
 
     def validate_stage(self, *_, **__):
         pass
@@ -182,8 +183,7 @@ class Select(EmbeddedModel):
     samples: List[ObjectId]
 
     def to_mongo(self, _, **__):
-        expr = ViewField('_id').is_in(self.samples)
-        return [{"$match": expr.to_mongo()}]
+        return [{'$match': {'_id': {'$in': self.samples}}}]
 
     def validate_stage(self, *_, **__):
         pass

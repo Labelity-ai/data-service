@@ -86,7 +86,7 @@ class ImageAnnotations(Model):
     polygons: List[Polygon] = []
     tags: List[Tag] = []
     attributes: Dict[str, Any] = {}
-    labels: List[Label]
+    labels: List[Label] = []
 
     @staticmethod
     def _extract_labels(objects: List[Prediction], shape: Shape, labels: set, attributes):

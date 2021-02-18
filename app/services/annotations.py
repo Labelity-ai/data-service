@@ -34,12 +34,13 @@ class AnnotationsService:
             try:
                 stage = STAGES[step.stage](**step.parameters)
                 stage.validate_stage(project_labels=project_labels, project_attributes=project_attributes)
-                pipeline.append(stage.to_mongo())
+                pipeline.extend(stage.to_mongo())
             except ValueError as error:
                 raise HTTPException(400, detail=error)
 
         collection = engine.get_collection(ImageAnnotations)
-        return await collection.aggregate(pipeline).to_list(length=None)
+        result = await collection.aggregate(pipeline).to_list(length=None)
+        return [ImageAnnotations.parse_doc(doc) for doc in result]
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema, project_id: ObjectId) -> ImageAnnotations:
