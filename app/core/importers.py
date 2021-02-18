@@ -22,10 +22,13 @@ def _normalize_points(points, item: DatasetItem):
         return points
 
     result = points[:]
-    width, height = item.image.size
+    height, width = item.image.size
 
-    for i in range(len(points) - 1):
-        result[i] /= width if i % 2 == 0 else height
+    for i in range(len(points)):
+        if i % 2 == 0:
+            result[i] /= width
+        else:
+            result[i] /= height
 
     return result
 
@@ -41,7 +44,8 @@ def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: Ob
         tags, detections, polygons, polylines, points = [], [], [], [], []
 
         for annotation in item.annotations:
-            label = labels[annotation.type][annotation.label]
+            # TODO: Fix this
+            label = labels[AnnotationType.label][annotation.label]
 
             if annotation.type == AnnotationType.label:
                 tags.append(
@@ -50,6 +54,7 @@ def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: Ob
 
             if annotation.type == AnnotationType.bbox:
                 box = _normalize_points(annotation.get_bbox(), item)
+                box = [box[0], box[1], box[0] + box[2], box[1] + box[3]]
                 detections.append(
                     Detection(label=label.name, attributes=annotation.attributes, box=box)
                 )
@@ -80,8 +85,11 @@ def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: Ob
             detections=detections,
             polylines=polylines,
             points=points,
-            project_id=project_id
+            project_id=project_id,
+            labels=[]
         )
+
+        image_annotations.labels = image_annotations.get_labels()
 
         annotations.append(image_annotations)
 

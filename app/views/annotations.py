@@ -76,5 +76,5 @@ class AnnotationsView:
         return APIMessage(detail=f"Deleted annotations {id}")
 
     @router.get("/annotations/meta/stages")
-    def get_annotations_by_id(self) -> Dict[str, dict]:
-        return AnnotationsService.get_stages_schema()
+    async def get_annotations_by_id(self) -> Dict[str, dict]:
+        return await AnnotationsService.get_stages_schema(self.project.id)

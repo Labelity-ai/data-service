@@ -8,6 +8,7 @@ from app.schema import ImageAnnotationsPostSchema
 from app.models import ImageAnnotations, Project, engine
 from app.core.importers import DatasetImportFormat, import_dataset
 from app.core.query_engine.stages import STAGES, QueryStage
+from app.services.projects import ProjectService
 
 
 class AnnotationsService:
@@ -26,10 +27,13 @@ class AnnotationsService:
     async def run_annotations_pipeline(query: List[QueryStage], project: Project) -> List[ImageAnnotations]:
         pipeline = [{'$match': {'project_id': project.id}}]
 
+        project_labels = ProjectService.get_project_labels(project.id)
+        project_attributes = ProjectService.get_project_attributes(project.id)
+
         for step in query:
             try:
                 stage = STAGES[step.stage](**step.parameters)
-                stage.validate_stage(project)
+                stage.validate_stage(project_labels=project_labels, project_attributes=project_attributes)
                 pipeline.append(stage.to_mongo())
             except ValueError as error:
                 raise HTTPException(400, detail=error)
@@ -71,13 +75,15 @@ class AnnotationsService:
         return await engine.save_all(annotations)
 
     @staticmethod
-    def get_stages_schema():
+    async def get_stages_schema(project_id: ObjectId):
         result = {}
+        project_labels = await ProjectService.get_project_labels(project_id)
+        project_attributes = await ProjectService.get_project_attributes(project_id)
 
         for stage_id, stage_class in STAGES.items():
-            print(stage_id)
             try:
-                result[stage_id] = stage_class.schema()
+                result[stage_id] = stage_class.get_json_schema(
+                    project_labels=project_labels, project_attributes=project_attributes)
             except Exception as e:
                 raise e
 
