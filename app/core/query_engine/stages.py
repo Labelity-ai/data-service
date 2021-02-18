@@ -1,14 +1,14 @@
 from typing import List, Optional, Union, Dict, Any
 import random
 from datetime import datetime
+from enum import Enum
 
 from pymongo import ASCENDING, DESCENDING
 
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
-from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations,\
-    Project, Shape, Model, ModelConfig, Label
-from pydantic import root_validator
+from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations, Shape, Model, ModelConfig, Label
+from pydantic import root_validator, create_model
 
 
 def _get_random_generator(seed):
@@ -62,6 +62,10 @@ class Exclude(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class Exists(EmbeddedModel):
     field: str
@@ -78,6 +82,10 @@ class Exists(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class Limit(EmbeddedModel):
     limit: int
@@ -91,6 +99,10 @@ class Limit(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class Skip(EmbeddedModel):
     skip: int
@@ -100,6 +112,10 @@ class Skip(EmbeddedModel):
             return []
 
         return [{"$skip": self.skip}]
+
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
 
 
 class Take(EmbeddedModel):
@@ -122,6 +138,10 @@ class Take(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class Match(EmbeddedModel):
     filter: QueryExpression
@@ -132,6 +152,10 @@ class Match(EmbeddedModel):
 
     def validate_stage(self, *_, **__):
         pass
+
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
 
 
 class Shuffle(EmbeddedModel):
@@ -149,6 +173,10 @@ class Shuffle(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class Select(EmbeddedModel):
     samples: List[ObjectId]
@@ -160,6 +188,10 @@ class Select(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class MatchTags(EmbeddedModel):
     tags: List[str]
@@ -169,27 +201,41 @@ class MatchTags(EmbeddedModel):
         return [{"$match": expr.to_mongo()}]
 
     def validate_stage(self, *_, **__):
+        # TODO: Validate that tag exists
         pass
+
+    @classmethod
+    def get_json_schema(cls, **_):
+        # TODO: Convert tags to list of enums
+        return cls.schema()
 
 
 class MapLabels(EmbeddedModel):
-    shape: Shape
-    mapping: Dict[str, str]
+    mapping: Dict[Shape, Dict[str, str]]
 
     def to_mongo(self):
-        field = _get_annotations_field(self.shape)
+        result = []
 
-        expression = ViewField(field).map(
-            ViewField().set_field("label", ViewField("label").map_values(self.mapping))
-        )
+        for shape, mapping in self.mapping.items():
+            field = _get_annotations_field(shape)
+            expression = ViewField(field).map(
+                ViewField().set_field("label", ViewField("label").map_values(mapping))
+            )
+            result.append({'$set': {field: expression.to_mongo()}})
 
-        return [{'$set': {field: expression.to_mongo()}}]
+        return result
 
     def validate_stage(self, project_labels: List[Label], **_):
-        mapping = {(label.name, label.shape) for label in project_labels}
-        for label in self.mapping.keys():
-            if (label, self.shape) not in mapping:
-                raise ValueError(f'Label {label} with shape {self.shape} not found in project task')
+        existing_mapping = {(label.name, label.shape) for label in project_labels}
+
+        for shape, mapping in self.mapping.items():
+            for label in mapping.keys():
+                if (label, shape) not in existing_mapping:
+                    raise ValueError(f'Label {label} with shape {shape} not found in project task')
+
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
 
 
 class SelectLabels(EmbeddedModel):
@@ -210,6 +256,12 @@ class SelectLabels(EmbeddedModel):
             if (label, self.shape) not in mapping:
                 raise ValueError(f'Label {label} with shape {self.shape} not found in project task')
 
+    @classmethod
+    def get_json_schema(cls, project_labels: List[Label], **_):
+        labels_enum = Enum('Label', [(label.name, label.name) for label in project_labels])
+        model = create_model('SelectLabels', labels=(List[labels_enum], ...), shape=(Shape, ...))
+        return model.schema()
+
 
 class FilterLabels(EmbeddedModel):
     filter: QueryExpression
@@ -222,6 +274,10 @@ class FilterLabels(EmbeddedModel):
 
     def validate_stage(self, *_, **__):
         pass
+
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
 
 
 class ExcludeLabels(EmbeddedModel):
@@ -242,6 +298,12 @@ class ExcludeLabels(EmbeddedModel):
             if (label, self.shape) not in mapping:
                 raise ValueError(f'Label {label} with shape {self.shape} not found in project task')
 
+    @classmethod
+    def get_json_schema(cls, project_labels: List[Label], **_):
+        labels_enum = Enum('Labels', [(label.name, label.name) for label in project_labels])
+        model = create_model('ExcludeLabels', shape=(Shape, ...), labels=(List[labels_enum], ...))
+        return model.schema()
+
 
 class SelectAttributes(EmbeddedModel):
     attributes: List[str]
@@ -253,6 +315,10 @@ class SelectAttributes(EmbeddedModel):
         FilterAttributes(attributes=self.attributes, filter=ViewExpression(True))\
             .validate_stage(*args, **kwargs)
 
+    @classmethod
+    def get_json_schema(cls, *args, **kwargs):
+        return FilterAttributes.get_json_schema(*args, **kwargs)
+
 
 class ExcludeAttributes(EmbeddedModel):
     attributes: List[str]
@@ -263,6 +329,10 @@ class ExcludeAttributes(EmbeddedModel):
     def validate_stage(self, *args, **kwargs):
         FilterAttributes(attributes=self.attributes, filter=ViewExpression(False))\
             .validate_stage(*args, **kwargs)
+
+    @classmethod
+    def get_json_schema(cls, *args, **kwargs):
+        return FilterAttributes.get_json_schema(*args, **kwargs)
 
 
 class FilterAttributes(EmbeddedModel):
@@ -280,6 +350,14 @@ class FilterAttributes(EmbeddedModel):
         for field in self.attributes:
             if field not in project_attributes:
                 raise ValueError('Field not found in project attributes')
+
+    @classmethod
+    def get_json_schema(cls, project_attributes: List[str], **_):
+        attributes_enum = Enum('Attribute', zip(project_attributes, project_attributes))
+        model = create_model('FilterAttributes',
+                             attributes=(List[attributes_enum], ...),
+                             filter=(QueryExpression, ...))
+        return model.schema()
 
 
 class SortBy(EmbeddedModel):
@@ -318,6 +396,10 @@ class SortBy(EmbeddedModel):
             # TODO:  Create an index on the field, if necessary, to make sorting more efficient
             pass
 
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
+
 
 class LimitLabels(EmbeddedModel):
     label: str
@@ -347,6 +429,12 @@ class LimitLabels(EmbeddedModel):
     def validate_stage(self, *_, **__):
         pass
 
+    @classmethod
+    def get_json_schema(cls, project_labels: List[Label], **_):
+        labels_enum = Enum('Label', [(label.name, label.name) for label in project_labels])
+        model = create_model('LimitLabels', label=(labels_enum, ...), shape=(Shape, ...), limit=(int, ...))
+        return model.schema()
+
 
 class SetAttribute(EmbeddedModel):
     attribute: str
@@ -363,10 +451,12 @@ class SetAttribute(EmbeddedModel):
         # TODO: Add support for label attributes
         return [{'$set': {f'{+ImageAnnotations.attributes}.{self.attribute}': expression}}]
 
-    def validate_stage(self, project_attributes: List[str], **_):
-        # TODO: Add support for nested fields
-        if self.attribute not in project_attributes:
-            raise ValueError('Field not found in project attributes')
+    def validate_stage(self, **_):
+        pass
+
+    @classmethod
+    def get_json_schema(cls, **_):
+        return cls.schema()
 
 
 STAGES = {
