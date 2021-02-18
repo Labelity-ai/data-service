@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from starlette import status
 
 from app.config import Config
-from app.models import User, engine, Project
+from app.models import User, engine, Project, ObjectId
 
 API_KEY_NAME = 'X-API-Key'
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
@@ -68,7 +68,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 async def get_project(x_api_key: str = Depends(API_KEY_HEADER),
                       user: Optional[User] = Depends(get_optional_current_user),
                       project_id: Optional[str] = Header(None)):
-    return await engine.find_one(Project, Project.user_id == '602a2f0deac5ef687b30ac21')
+    return await engine.find_one(Project, Project.id == ObjectId('602a2f0deac5ef687b30ac21'))
 
     if user and project_id:
         project = await engine.find_one(Project, Project.user_id == user.id)
