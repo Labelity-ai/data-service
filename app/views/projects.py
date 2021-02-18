@@ -49,5 +49,8 @@ class ProjectsView:
 
     @router.get("/project/{id}/labels")
     async def get_project_labels(self, id: ObjectId) -> List[Label]:
-        # TODO:
-        return []
+        return await ProjectService.get_project_labels(id)
+
+    @router.get("/project/{id}/attributes")
+    async def get_project_labels(self, id: ObjectId) -> List[str]:
+        return await ProjectService.get_project_attributes(id)

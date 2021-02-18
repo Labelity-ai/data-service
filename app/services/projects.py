@@ -40,10 +40,10 @@ class ProjectService:
     async def get_project_labels(project_id: ObjectId) -> List[Label]:
         labels_pipeline = [
             # Select images within specific project
-            {'$match': {'$project_id': project_id}},
+            {'$match': {'project_id': project_id}},
             # Select the labels field and set is as root of the pipeline
-            {"$unwind": "$_labels"},
-            {"$replaceRoot": {"newRoot": "$_labels"}},
+            {"$unwind": "$labels"},
+            {"$replaceRoot": {"newRoot": "$labels"}},
             # Group labels by shape and name and create the field attributes as list of lists
             {'$group': {
                 '_id': {'shape': '$shape', 'name': '$name'},
@@ -81,5 +81,6 @@ class ProjectService:
 
         collection = engine.get_collection(ImageAnnotations)
         attributes = await collection.aggregate(labels_pipeline).to_list(length=None)
+        attributes = [doc['_id'] for doc in attributes]
 
-        return [doc['_id'] for doc in attributes]
+        return [attr for attr in attributes if attr is not None]
