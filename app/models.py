@@ -152,8 +152,8 @@ class Project(Model):
 class QueryExpression(BaseModel):
     field: Optional[str]
     literal: Union[int, float, str, None]
-    operator: str
-    parameters: Dict[str, Union[float, QueryExpression, str]]
+    operator: Optional[str]
+    parameters: Dict[str, Union[float, QueryExpression, str]] = {}
 
     Config = ModelConfig
 
