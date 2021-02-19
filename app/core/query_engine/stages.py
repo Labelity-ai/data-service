@@ -319,12 +319,43 @@ class SelectAttributes(EmbeddedModel):
             attributes=self.attributes, filter=QueryExpression(literal=True)).to_mongo()
 
     def validate_stage(self, *args, **kwargs):
-        FilterAttributes(attributes=self.attributes, filter=QueryExpression(literal=True))\
+        FilterAttributes(attributes=self.attributes, filter=QueryExpression(literal=True)) \
             .validate_stage(*args, **kwargs)
 
     @classmethod
     def get_json_schema(cls, *args, **kwargs):
         return FilterAttributes.get_json_schema(*args, **kwargs)
+
+
+class SelectLabelAttributes(EmbeddedModel):
+    attributes: List[str]
+
+    def to_mongo(self):
+        return FilterLabelAttributes(
+            attributes=self.attributes, filter=QueryExpression(literal=True)).to_mongo()
+
+    def validate_stage(self, *args, **kwargs):
+        FilterLabelAttributes(attributes=self.attributes, filter=QueryExpression(literal=True)) \
+            .validate_stage(*args, **kwargs)
+
+    @classmethod
+    def get_json_schema(cls, *args, **kwargs):
+        return FilterLabelAttributes.get_json_schema(*args, **kwargs)
+
+
+class ExcludeLabelAttributes(EmbeddedModel):
+    attributes: List[str]
+
+    def to_mongo(self):
+        return FilterLabelAttributes(attributes=self.attributes, filter=QueryExpression(literal=False)).to_mongo()
+
+    def validate_stage(self, *args, **kwargs):
+        FilterLabelAttributes(attributes=self.attributes, filter=QueryExpression(literal=False)) \
+            .validate_stage(*args, **kwargs)
+
+    @classmethod
+    def get_json_schema(cls, *args, **kwargs):
+        return FilterLabelAttributes.get_json_schema(*args, **kwargs)
 
 
 class ExcludeAttributes(EmbeddedModel):
@@ -334,7 +365,7 @@ class ExcludeAttributes(EmbeddedModel):
         return FilterAttributes(attributes=self.attributes, filter=QueryExpression(literal=False)).to_mongo()
 
     def validate_stage(self, *args, **kwargs):
-        FilterAttributes(attributes=self.attributes, filter=QueryExpression(literal=False))\
+        FilterAttributes(attributes=self.attributes, filter=QueryExpression(literal=False)) \
             .validate_stage(*args, **kwargs)
 
     @classmethod
@@ -364,6 +395,45 @@ class FilterAttributes(EmbeddedModel):
         model = create_model('FilterAttributes',
                              attributes=(List[attributes_enum], ...),
                              filter=(QueryExpression, ...))
+        return model.schema()
+
+
+class FilterLabelAttributes(EmbeddedModel):
+    attributes: List[str]
+    filter: QueryExpression
+    shape: Optional[Shape]
+
+    def to_mongo(self):
+        if not self.attributes:
+            return []
+
+        shapes = [self.shape] if self.shape else list(Shape)
+        result = {'$project': {}}
+        expression = construct_view_expression(self.filter).to_mongo()
+
+        for shape in shapes:
+            field = _get_annotations_field(shape)
+            result['$project'][field] = {'attributes': {attr: expression for attr in self.attributes}}
+
+        return [result]
+
+    def validate_stage(self, project_labels: List[Label], **_):
+        label_attributes = set()
+
+        for label in project_labels:
+            label_attributes.update(label.attributes)
+
+        for field in self.attributes:
+            if field not in label_attributes:
+                raise ValueError(f'Attribute {field} not found in labels attributes')
+
+    @classmethod
+    def get_json_schema(cls, project_attributes: List[str], **_):
+        attributes_enum = Enum('Attribute', zip(project_attributes, project_attributes))
+        model = create_model('FilterLabelAttributes',
+                             attributes=(List[attributes_enum], ...),
+                             filter=(QueryExpression, ...),
+                             shape=(Optional[Shape], ...))
         return model.schema()
 
 
@@ -510,4 +580,7 @@ STAGES = {
     'limit_labels': LimitLabels,
     'set_attribute': SetAttribute,
     'set_label_attribute': SetLabelAttribute,
+    'exclude_label_attributes': ExcludeLabelAttributes,
+    'select_label_attributes': SelectLabelAttributes,
+    'filter_label_attributes': FilterLabelAttributes,
 }
