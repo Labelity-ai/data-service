@@ -103,6 +103,9 @@ def construct_view_expression(query: QueryExpression) -> ViewExpression:
 
     expression = ViewExpression(query.literal) if query.literal else ViewField(query.field)
 
+    if not query.operator:
+        return expression
+
     if query.operator in OPERATORS:
         return OPERATORS[query.operator](expression, **parameters)
     elif query.operator in METHOD_OPERATORS:
