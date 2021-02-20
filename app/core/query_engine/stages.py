@@ -20,7 +20,7 @@ def _get_random_generator(seed):
     return _random
 
 
-def _get_annotations_field(shape: Shape):
+def _get_annotations_field(shape: Union[Shape, str]):
     if shape == Shape.TAG:
         return 'tag'
     elif shape == Shape.BOX:
@@ -31,6 +31,15 @@ def _get_annotations_field(shape: Shape):
         return 'polygons'
     elif shape == Shape.POLYLINE:
         return 'polylines'
+
+
+def _get_projection_stage(project_expr):
+    return {'$project': {
+        +ImageAnnotations.project_id: 1,
+        +ImageAnnotations.event_id: 1,
+        +ImageAnnotations.attributes: 1,
+        **project_expr
+    }}
 
 
 class QueryStage(EmbeddedModel):
@@ -104,7 +113,7 @@ class Limit(EmbeddedModel):
 class Skip(EmbeddedModel):
     skip: int
 
-    def to_mongo(self, _, **__):
+    def to_mongo(self):
         if self.skip <= 0:
             return []
 
@@ -119,7 +128,7 @@ class Take(EmbeddedModel):
     size: int
     seed: Optional[int] = None
 
-    def to_mongo(self, _, **__):
+    def to_mongo(self):
         randint = _get_random_generator(self.seed).randint(int(1e7), int(1e10))
 
         if self.size <= 0:
@@ -158,7 +167,7 @@ class Match(EmbeddedModel):
 class Shuffle(EmbeddedModel):
     seed: Optional[int] = None
 
-    def to_mongo(self, _, **__):
+    def to_mongo(self):
         randint = _get_random_generator(self.seed).randint(int(1e7), int(1e10))
 
         return [
@@ -178,7 +187,7 @@ class Shuffle(EmbeddedModel):
 class Select(EmbeddedModel):
     samples: List[ObjectId]
 
-    def to_mongo(self, _, **__):
+    def to_mongo(self):
         return [{'$match': {'_id': {'$in': self.samples}}}]
 
     def validate_stage(self, *_, **__):
@@ -235,27 +244,39 @@ class MapLabels(EmbeddedModel):
 
 
 class SelectLabels(EmbeddedModel):
-    shape: Shape
-    labels: List[str]
+    labels: Dict[Shape, List[str]]
+    filter_empty: bool = True
 
     def to_mongo(self):
         if not self.labels:
             return []
 
-        field = _get_annotations_field(self.shape)
+        project_result = {}
+        is_empty_expr = ViewExpression(False)
 
-        return [{
-            "$project": {
-                field: ViewField(f'${field}').filter(ViewField('label').is_in(self.labels))
-            }
-        }]
+        for shape in Shape:
+            field = _get_annotations_field(shape)
+            is_empty_expr = is_empty_expr | (ViewField(field).length() > 0)
+
+        for shape, labels in self.labels.items():
+            field = _get_annotations_field(shape)
+            project_result[field] = ViewField(f'${field}').filter(ViewField('label').is_in(labels)).to_mongo()
+
+        if not self.filter_empty:
+            return [_get_projection_stage(project_result)]
+        else:
+            return [
+                _get_projection_stage(project_result),
+                {"$match": {"$expr": is_empty_expr.to_mongo()}}
+            ]
 
     def validate_stage(self, project_labels: List[Label], **_):
         mapping = {(label.name, label.shape) for label in project_labels}
 
-        for label in self.labels:
-            if (label, self.shape) not in mapping:
-                raise ValueError(f'Label {label} with shape {self.shape} not found in project task')
+        for shape, labels in self.labels.items():
+            for label in labels:
+                if (label, shape) not in mapping:
+                    raise ValueError(f'Label {label} with shape {shape} not found in project task')
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
@@ -271,7 +292,8 @@ class FilterLabels(EmbeddedModel):
     def to_mongo(self):
         field = _get_annotations_field(self.shape)
         filter_expr = construct_view_expression(self.filter)
-        return [{"$project": {field: ViewField(f'${field}').filter(filter_expr)}}]
+        project = {field: ViewField(f'${field}').filter(filter_expr)}
+        return [_get_projection_stage(project)]
 
     def validate_stage(self, *_, **__):
         pass
@@ -282,27 +304,37 @@ class FilterLabels(EmbeddedModel):
 
 
 class ExcludeLabels(EmbeddedModel):
-    shape: Shape
-    labels: List[str]
+    labels: Dict[Shape, List[str]]
+    filter_empty: bool = True
 
     def to_mongo(self):
-        if not self.labels:
-            return []
+        project_result = {}
+        is_empty_expr = ViewExpression(False)
 
-        field = _get_annotations_field(self.shape)
+        for shape in Shape:
+            field = _get_annotations_field(shape)
+            is_empty_expr = is_empty_expr | (ViewField(field).length() > 0)
+            project_result[field] = 1
 
-        return [{
-            "$project": {
-                field: ViewField(f'${field}').filter(~ViewField('label').is_in(self.labels))
-            }
-        }]
+        for shape, labels in self.labels.items():
+            field = _get_annotations_field(shape)
+            project_result[field] = ViewField(f'${field}').filter(~ViewField('label').is_in(labels)).to_mongo()
+
+        if not self.filter_empty:
+            return [_get_projection_stage(project_result)]
+        else:
+            return [
+                _get_projection_stage(project_result),
+                {"$match": {"$expr": is_empty_expr.to_mongo()}}
+            ]
 
     def validate_stage(self, project_labels: List[Label], **_):
         mapping = {(label.name, label.shape) for label in project_labels}
 
-        for label in self.labels:
-            if (label, self.shape) not in mapping:
-                raise ValueError(f'Label {label} with shape {self.shape} not found in project task')
+        for shape, labels in self.labels.items():
+            for label in labels:
+                if (label, shape) not in mapping:
+                    raise ValueError(f'Label {label} with shape {shape} not found in project task')
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
@@ -557,6 +589,16 @@ class SetLabelAttribute(EmbeddedModel):
     @classmethod
     def get_json_schema(cls, **_):
         return cls.schema()
+
+
+def make_paginated_pipeline(pipeline: List[dict], page_size: int, page: int):
+    stage = {
+        '$facet': {
+            'metadata': [{'$count': 'total'}, {'$addFields': {'page': page}}],
+            'data': [{'$skip': page * page_size}, {'$limit': page_size}]
+        }
+    }
+    return pipeline + [stage]
 
 
 STAGES = {
