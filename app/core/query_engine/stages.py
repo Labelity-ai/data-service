@@ -7,7 +7,8 @@ from pymongo import ASCENDING, DESCENDING
 
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
-from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations, Shape, Model, ModelConfig, Label
+from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations,\
+    Shape, Model, ModelConfig, Label, Field
 from pydantic import root_validator, create_model
 
 
@@ -58,7 +59,9 @@ class QueryStage(EmbeddedModel):
 
 class QueryPipeline(Model):
     steps: List[QueryStage]
-    created_at: datetime
+    project_id: ObjectId
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    dataset_id: Optional[ObjectId] = None
 
     Config = ModelConfig
 

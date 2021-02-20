@@ -30,6 +30,10 @@ class AnnotationsView:
     async def get_annotations_by_id(self, id: ObjectId) -> ImageAnnotations:
         return await AnnotationsService.get_annotations_by_id(id, self.project.id)
 
+    @router.get("/annotations/")
+    async def get_annotations(self, page: int = 0, page_size: int = 10) -> AnnotationsQueryResult:
+        return await AnnotationsService.get_annotations(page_size, page, self.project)
+
     @router.post("/annotations/pipeline")
     async def run_annotations_pipeline(self, query: List[QueryStage], page=0, page_size=10) -> AnnotationsQueryResult:
         return await AnnotationsService.run_annotations_pipeline(

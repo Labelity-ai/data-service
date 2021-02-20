@@ -7,7 +7,7 @@ from odmantic import ObjectId
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult
 from app.models import ImageAnnotations, Project, engine
 from app.core.importers import DatasetImportFormat, import_dataset
-from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline
+from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline, QueryPipeline
 from app.services.projects import ProjectService
 
 
@@ -22,6 +22,14 @@ class AnnotationsService:
             raise HTTPException(404)
 
         return annotations
+
+    @staticmethod
+    async def get_annotations(page_size: int, page: int, project: Project) -> AnnotationsQueryResult:
+        pipeline = [{'$match': {'project_id': project.id}}]
+        pipeline = make_paginated_pipeline(pipeline, page_size, page)
+        collection = engine.get_collection(ImageAnnotations)
+        result, *_ = await collection.aggregate(pipeline).to_list(length=None)
+        return AnnotationsQueryResult(data=result['data'], pagination=result['metadata'][0])
 
     @staticmethod
     async def run_annotations_pipeline(query: List[QueryStage],
@@ -45,7 +53,12 @@ class AnnotationsService:
         collection = engine.get_collection(ImageAnnotations)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
         print(result)
-        return AnnotationsQueryResult(data=result['data'], metadata=result['metadata'][0])
+
+        pipeline_obj = QueryPipeline(steps=query, project_id=project.id)
+        pipeline_obj = await engine.save(pipeline_obj)
+
+        return AnnotationsQueryResult(
+            data=result['data'], pagination=result['metadata'][0], pipeline_id=pipeline_obj.id)
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema, project_id: ObjectId) -> ImageAnnotations:
