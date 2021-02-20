@@ -1,10 +1,10 @@
-from typing import List, Union, Dict, Optional
+from typing import List
 from enum import Enum
 from functools import partial
 from pydantic import BaseModel
 from fastapi_utils.camelcase import snake2camel
 
-from app.models import Polyline, Detection, Polygon, Tag
+from app.models import Polyline, Detection, Polygon, Tag, ImageAnnotations, EmbeddedModel, ModelConfig
 from app.utils import json_dumps, json_loads
 
 
@@ -42,3 +42,14 @@ class DatasetPostSchema(SchemaBase):
 
 class DatasetGetSortQuery(Enum):
     NAME = 'name'
+
+
+class AnnotationsQueryResult(EmbeddedModel):
+    class Metadata(BaseModel):
+        page: int
+        total: int
+
+    data: List[ImageAnnotations]
+    metadata: Metadata
+
+    Config = ModelConfig

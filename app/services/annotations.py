@@ -4,10 +4,10 @@ from pathlib import Path
 from fastapi import HTTPException
 from odmantic import ObjectId
 
-from app.schema import ImageAnnotationsPostSchema
+from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult
 from app.models import ImageAnnotations, Project, engine
 from app.core.importers import DatasetImportFormat, import_dataset
-from app.core.query_engine.stages import STAGES, QueryStage
+from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline
 from app.services.projects import ProjectService
 
 
@@ -24,11 +24,13 @@ class AnnotationsService:
         return annotations
 
     @staticmethod
-    async def run_annotations_pipeline(query: List[QueryStage], project: Project) -> List[ImageAnnotations]:
+    async def run_annotations_pipeline(query: List[QueryStage],
+                                       page_size: int, page: int,
+                                       project: Project) -> AnnotationsQueryResult:
         pipeline = [{'$match': {'project_id': project.id}}]
 
-        project_labels = ProjectService.get_project_labels(project.id)
-        project_attributes = ProjectService.get_project_attributes(project.id)
+        project_labels = await ProjectService.get_project_labels(project.id)
+        project_attributes = await ProjectService.get_project_attributes(project.id)
 
         for step in query:
             try:
@@ -36,11 +38,14 @@ class AnnotationsService:
                 stage.validate_stage(project_labels=project_labels, project_attributes=project_attributes)
                 pipeline.extend(stage.to_mongo())
             except ValueError as error:
-                raise HTTPException(400, detail=error)
+                print(error)
+                raise HTTPException(400, detail=str(error))
 
+        pipeline = make_paginated_pipeline(pipeline, page_size, page)
         collection = engine.get_collection(ImageAnnotations)
-        result = await collection.aggregate(pipeline).to_list(length=None)
-        return [ImageAnnotations.parse_doc(doc) for doc in result]
+        result, *_ = await collection.aggregate(pipeline).to_list(length=None)
+        print(result)
+        return AnnotationsQueryResult(data=result['data'], metadata=result['metadata'][0])
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema, project_id: ObjectId) -> ImageAnnotations:

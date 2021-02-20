@@ -8,7 +8,7 @@ from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, File, UploadFile
 from odmantic import ObjectId
 
-from app.schema import ImageAnnotationsPostSchema
+from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult
 from app.models import ImageAnnotations, Project
 from app.security import get_project
 from app.config import Config
@@ -31,8 +31,9 @@ class AnnotationsView:
         return await AnnotationsService.get_annotations_by_id(id, self.project.id)
 
     @router.post("/annotations/pipeline")
-    async def run_annotations_pipeline(self, query: List[QueryStage]) -> List[ImageAnnotations]:
-        return await AnnotationsService.run_annotations_pipeline(query, self.project)
+    async def run_annotations_pipeline(self, query: List[QueryStage], page=0, page_size=10) -> AnnotationsQueryResult:
+        return await AnnotationsService.run_annotations_pipeline(
+            query=query, page_size=page_size, page=page, project=self.project)
 
     @router.post("/annotations")
     async def add_annotations(self, annotation: ImageAnnotationsPostSchema) -> ImageAnnotations:
