@@ -1,5 +1,6 @@
 from typing import List
 
+from fastapi_utils.api_model import APIMessage
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status
@@ -50,11 +51,11 @@ class DatasetsView:
         return await DatasetService.create_dataset(dataset, self.project.id)
 
     @router.put("/dataset/{id}")
-    async def add_dataset(self, id: ObjectId, dataset: DatasetPostSchema) -> Dataset:
+    async def replace_dataset(self, id: ObjectId, dataset: DatasetPostSchema) -> Dataset:
         return await DatasetService.update_dataset(id, dataset, self.project.id)
 
     @router.delete("/dataset/{id}")
-    async def delete_dataset(self, id: ObjectId) -> Dataset:
+    async def delete_dataset(self, id: ObjectId):
         await DatasetService.delete_dataset(id, self.project.id)
         return APIMessage(detail=f"Deleted dataset {id}")
 
