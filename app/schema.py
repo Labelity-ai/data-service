@@ -1,11 +1,12 @@
-from typing import List
+from typing import List, Optional
 from enum import Enum
 from functools import partial
 from pydantic import BaseModel
 from fastapi_utils.camelcase import snake2camel
 
-from app.models import Polyline, Detection, Polygon, Tag, ImageAnnotations, EmbeddedModel, ModelConfig
 from app.utils import json_dumps, json_loads
+from app.models import Polyline, Detection, Polygon, Tag, ImageAnnotations,\
+    EmbeddedModel, ModelConfig, ObjectId
 
 
 class SchemaBase(BaseModel):
@@ -45,11 +46,12 @@ class DatasetGetSortQuery(Enum):
 
 
 class AnnotationsQueryResult(EmbeddedModel):
-    class Metadata(BaseModel):
+    class Pagination(BaseModel):
         page: int
         total: int
 
     data: List[ImageAnnotations]
-    metadata: Metadata
+    pagination: Pagination
+    pipeline_id: Optional[ObjectId] = None
 
     Config = ModelConfig

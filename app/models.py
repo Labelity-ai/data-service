@@ -4,7 +4,7 @@ import enum
 from collections import defaultdict
 from datetime import datetime
 
-from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
+from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine, Field
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import validator, BaseModel
 
@@ -119,6 +119,7 @@ class Dataset(Model):
     description: str
     annotations: List[ObjectId]
     project_id: ObjectId
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     Config = ModelConfig
 
@@ -144,7 +145,7 @@ class Project(Model):
     description: str
     user_id: ObjectId
     api_keys: List[str] = []
-    attributes: List[str] = []
+    #updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     Config = ModelConfig
 
@@ -154,6 +155,7 @@ class QueryExpression(BaseModel):
     literal: Union[int, float, str, None]
     operator: Optional[str]
     parameters: Dict[str, Union[float, QueryExpression, str]] = {}
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     Config = ModelConfig
 
