@@ -35,9 +35,10 @@ class AnnotationsView:
         return await AnnotationsService.get_annotations(page_size, page, self.project)
 
     @router.post("/annotations/pipeline")
-    async def run_annotations_pipeline(self, query: List[QueryStage], page=0, page_size=10) -> AnnotationsQueryResult:
+    async def run_annotations_pipeline(self, query: List[QueryStage],
+                                       page: int = 0, page_size: int = 10) -> AnnotationsQueryResult:
         return await AnnotationsService.run_annotations_pipeline(
-            query=query, page_size=page_size, page=page, project=self.project)
+            query=query, page_size=int(page_size), page=int(page), project=self.project)
 
     @router.post("/annotations")
     async def add_annotations(self, annotation: ImageAnnotationsPostSchema) -> ImageAnnotations:
@@ -81,5 +82,5 @@ class AnnotationsView:
         return APIMessage(detail=f"Deleted annotations {id}")
 
     @router.get("/annotations/meta/stages")
-    async def get_annotations_by_id(self) -> Dict[str, dict]:
+    async def get_annotations_stages(self) -> Dict[str, dict]:
         return await AnnotationsService.get_stages_schema(self.project.id)

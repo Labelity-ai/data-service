@@ -155,7 +155,7 @@ class QueryExpression(BaseModel):
     literal: Union[int, float, str, None]
     operator: Optional[str]
     parameters: Dict[str, Union[float, QueryExpression, str]] = {}
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    #created_at: datetime = Field(default_factory=datetime.utcnow)
 
     Config = ModelConfig
 
