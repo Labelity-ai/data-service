@@ -55,3 +55,9 @@ class AnnotationsQueryResult(EmbeddedModel):
     pipeline_id: Optional[ObjectId] = None
 
     Config = ModelConfig
+
+
+class ApiKey(BaseModel):
+    key: str
+    scopes: List[str]
+

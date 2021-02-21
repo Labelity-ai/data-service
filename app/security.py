@@ -72,7 +72,7 @@ async def get_project(x_api_key: str = Depends(API_KEY_HEADER),
 
     if user and project_id:
         project = await engine.find_one(Project, Project.user_id == user.id)
-    elif x_api_key == "1234567890":
+    elif x_api_key:
         project = await engine.find_one(Project, {+Project.api_keys: x_api_key})
     else:
         project = None

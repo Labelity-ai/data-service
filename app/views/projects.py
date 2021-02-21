@@ -6,7 +6,7 @@ from fastapi_utils.api_model import APIMessage
 from fastapi import Depends
 from odmantic import ObjectId
 
-from app.schema import ProjectPostSchema
+from app.schema import ProjectPostSchema, ApiKey
 from app.models import Project, Label, User, TestUser
 from app.security import get_current_active_user
 from app.services.projects import ProjectService
@@ -37,6 +37,10 @@ class ProjectsView:
     @router.post("/project")
     async def add_project(self, project: ProjectPostSchema) -> Project:
         return await ProjectService.add_project(project, self.user.id)
+
+    @router.post("/project/{id}/api_key")
+    async def add_api_key(self, id) -> ApiKey:
+        return await ProjectService.add_api_key(id, self.user.id)
 
     @router.put("/project/{id}")
     async def update_project(self, id: ObjectId, project: ProjectPostSchema) -> Project:
