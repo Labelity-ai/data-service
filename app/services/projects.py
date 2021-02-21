@@ -1,9 +1,10 @@
 from typing import List
+import secrets
 
 from fastapi import HTTPException
 from odmantic import ObjectId
 
-from app.schema import ProjectPostSchema
+from app.schema import ProjectPostSchema, ApiKey
 from app.models import engine, Project, ImageAnnotations, Label
 
 
@@ -35,6 +36,15 @@ class ProjectService:
     async def delete_project(project_id: ObjectId, user_id: ObjectId):
         project = await ProjectService.get_project_by_id(project_id, user_id)
         await engine.delete(project)
+
+    @staticmethod
+    async def add_api_key(project_id: ObjectId, user_id: ObjectId) -> ApiKey:
+        project = await ProjectService.get_project_by_id(project_id, user_id)
+        api_key = secrets.token_urlsafe(20)
+        # TODO: Check if api key is unique. Is it necessary?
+        project.api_keys.extend(api_key)
+        await engine.save(project)
+        return ApiKey(key=api_key, scopes=['all'])
 
     @staticmethod
     async def get_project_labels(project_id: ObjectId) -> List[Label]:
