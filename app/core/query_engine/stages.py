@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING
 
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
-from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations,\
+from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations, \
     Shape, Model, ModelConfig, Label, Field
 from pydantic import root_validator, create_model
 
@@ -406,7 +406,8 @@ class FilterAttributes(EmbeddedModel):
             return []
 
         filter_expr = construct_view_expression(self.filter).to_mongo()
-        return {"$project": {f'attributes.{attribute}': filter_expr for attribute in self.attributes}}
+        project_expr = {f'attributes.{attribute}': filter_expr for attribute in self.attributes}
+        return [_get_projection_stage(project_expr)]
 
     def validate_stage(self, *_, **__):
         pass
@@ -430,14 +431,25 @@ class FilterLabelAttributes(EmbeddedModel):
             return []
 
         shapes = [self.shape] if self.shape else list(Shape)
-        result = {'$project': {}}
-        expression = construct_view_expression(self.filter).to_mongo()
+        result = {}
 
         for shape in shapes:
             field = _get_annotations_field(shape)
-            result['$project'][field] = {'attributes': {attr: expression for attr in self.attributes}}
 
-        return [result]
+            for attr in self.attributes:
+                attr_field = f'attributes.{attr}'
+                filter_expr = self.filter.copy()
+                filter_expr.field = f'${result[field]}.attributes.{attr_field}{filter_expr.field}'
+                expression = construct_view_expression(filter_expr).to_mongo()
+                result[field][attr_field] = {
+                    '$cond': {
+                        'if': expression,
+                        'then': f'${result[field]}.attributes.{attr_field}',
+                        'else': '$$REMOVE',
+                    }
+                }
+
+        return [_get_projection_stage(result)]
 
     def validate_stage(self, *_, **__):
         pass
@@ -551,12 +563,8 @@ class SetLabelAttribute(EmbeddedModel):
         expression = expression.to_mongo()
         field = _get_annotations_field(self.shape)
         set_field_expr = ViewField().set_field(f'attributes.{self.attribute}', expression)
-
-        return [{
-            "$project": {
-                field: ViewField(f'${field}').map(set_field_expr)
-            }
-        }]
+        project_expr = {field: ViewField(f'${field}').map(set_field_expr)}
+        return [_get_projection_stage(project_expr)]
 
     def validate_stage(self, *_, **__):
         pass
