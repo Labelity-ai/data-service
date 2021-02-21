@@ -209,7 +209,6 @@ class MatchTags(EmbeddedModel):
         return [{"$match": {'$expr': expr.to_mongo()}}]
 
     def validate_stage(self, *_, **__):
-        # TODO: Validate that tag exists
         pass
 
     @classmethod
@@ -273,13 +272,8 @@ class SelectLabels(EmbeddedModel):
                 {"$match": {"$expr": is_empty_expr.to_mongo()}}
             ]
 
-    def validate_stage(self, project_labels: List[Label], **_):
-        mapping = {(label.name, label.shape) for label in project_labels}
-
-        for shape, labels in self.labels.items():
-            for label in labels:
-                if (label, shape) not in mapping:
-                    raise ValueError(f'Label {label} with shape {shape} not found in project task')
+    def validate_stage(self, *_, **__):
+        pass
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
@@ -331,13 +325,8 @@ class ExcludeLabels(EmbeddedModel):
                 {"$match": {"$expr": is_empty_expr.to_mongo()}}
             ]
 
-    def validate_stage(self, project_labels: List[Label], **_):
-        mapping = {(label.name, label.shape) for label in project_labels}
-
-        for shape, labels in self.labels.items():
-            for label in labels:
-                if (label, shape) not in mapping:
-                    raise ValueError(f'Label {label} with shape {shape} not found in project task')
+    def validate_stage(self, *_, **__):
+        pass
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
@@ -419,10 +408,8 @@ class FilterAttributes(EmbeddedModel):
         filter_expr = construct_view_expression(self.filter).to_mongo()
         return {"$project": {f'attributes.{attribute}': filter_expr for attribute in self.attributes}}
 
-    def validate_stage(self, project_attributes: List[str], **_):
-        for field in self.attributes:
-            if field not in project_attributes:
-                raise ValueError('Field not found in project attributes')
+    def validate_stage(self, *_, **__):
+        pass
 
     @classmethod
     def get_json_schema(cls, project_attributes: List[str], **_):
@@ -452,15 +439,8 @@ class FilterLabelAttributes(EmbeddedModel):
 
         return [result]
 
-    def validate_stage(self, project_labels: List[Label], **_):
-        label_attributes = set()
-
-        for label in project_labels:
-            label_attributes.update(label.attributes)
-
-        for field in self.attributes:
-            if field not in label_attributes:
-                raise ValueError(f'Attribute {field} not found in labels attributes')
+    def validate_stage(self, *_, **__):
+        pass
 
     @classmethod
     def get_json_schema(cls, project_attributes: List[str], **_):
@@ -500,13 +480,8 @@ class SortBy(EmbeddedModel):
         elif isinstance(expression, ViewExpression):
             return expression.to_mongo()
 
-    def validate_stage(self, project_attributes: List[str], project_labels: List[Label]):
-        field_or_expr = self._get_mongo_field_or_expr()
-
-        if isinstance(field_or_expr, str):
-            # TODO: Make sure the field exists
-            # TODO:  Create an index on the field, if necessary, to make sorting more efficient
-            pass
+    def validate_stage(self, *_, **__):
+        pass
 
     @classmethod
     def get_json_schema(cls, **_):
@@ -583,11 +558,8 @@ class SetLabelAttribute(EmbeddedModel):
             }
         }]
 
-    def validate_stage(self, project_labels: List[Label], **_):
-        mapping = {(label.name, label.shape) for label in project_labels}
-
-        if (self.label, self.shape) not in mapping:
-            raise ValueError(f'Label {self.label} with shape {self.shape} not found in project task')
+    def validate_stage(self, *_, **__):
+        pass
 
     @classmethod
     def get_json_schema(cls, **_):
