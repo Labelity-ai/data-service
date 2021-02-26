@@ -9,7 +9,7 @@ class Config:
     POST_BULK_LIMIT = os.environ.get('POST_BULK_LIMIT', 1000)
     MONGO_HOST = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
     MONGO_DATABASE = os.environ.get('MONGO_DATABASE', 'default_database')
-    IMAGE_STORAGE_BUCKET = os.environ.get('MONGO_DATABASE', 'default_database')
+    IMAGE_STORAGE_BUCKET = os.environ.get('IMAGE_STORAGE_BUCKET', 'labelity-use1-dev-user-storage')
     RAW_IMAGES_FOLDER = os.environ.get('RAW_IMAGES_FOLDER', 'raw')
     THUMBNAILS_FOLDER = os.environ.get('THUMBNAILS_FOLDER', 'thumbnails')
     OPTIMIZED_IMAGES_FOLDER = os.environ.get('OPTIMIZED_IMAGES_FOLDER', 'optimized')
