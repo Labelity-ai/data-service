@@ -71,13 +71,16 @@ class AnnotationsService:
                                    replace: bool,
                                    project_id: ObjectId) -> List[ImageAnnotations]:
         event_ids = [annotation.event_id for annotation in annotations]
-        instances = engine.find(ImageAnnotations, ImageAnnotations.event_id.in_(event_ids))
-        instances = {instance.event_id:instances for instance in instances}
+        previous_instances = await engine.find(
+            ImageAnnotations, ImageAnnotations.event_id.in_(event_ids))
+        event_id_to_instance = {ins.event_id: ins for ins in previous_instances}
         result = []
 
         for annotation in annotations:
-            instance = instances.get(annotation.event_id) or ImageAnnotations(
-                event_id=annotation.event_id, project_id=project_id)
+            if annotation.event_id in event_id_to_instance:
+                instance = event_id_to_instance.get(annotation.event_id)
+            else:
+                instance = ImageAnnotations(event_id=annotation.event_id, project_id=project_id)
 
             if replace:
                 instance.detections = annotation.detections
@@ -94,7 +97,7 @@ class AnnotationsService:
 
             result.append(instance)
 
-        return await engine.save_all(instances)
+        return await engine.save_all(result)
 
     @staticmethod
     async def update_annotations(annotations_id: ObjectId,
