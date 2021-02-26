@@ -41,7 +41,7 @@ def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: Ob
     for row in dataset:
         item: DatasetItem = row
         event_id = item.image.path.split('/')[-1] if item.has_image else item.id
-        tags, detections, polygons, polylines, points = [], [], [], [], []
+        tags, detections, polygons, polylines, keypoints = [], [], [], [], []
 
         for annotation in item.annotations:
             # TODO: Fix this
@@ -73,7 +73,7 @@ def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: Ob
 
             if annotation.type == AnnotationType.points:
                 points = _normalize_points(annotation.points, item)
-                points.append(
+                keypoints.append(
                     Keypoints(label=label.name, attributes=annotation.attributes, points=points)
                 )
 
@@ -84,7 +84,7 @@ def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: Ob
             polygons=polygons,
             detections=detections,
             polylines=polylines,
-            points=points,
+            points=keypoints,
             project_id=project_id,
             labels=[]
         )

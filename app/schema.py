@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from enum import Enum
 from functools import partial
 from pydantic import BaseModel
@@ -23,8 +23,9 @@ class ImageAnnotationsPostSchema(SchemaBase):
     points: List[Polyline] = []
     polylines: List[Polyline] = []
     detections: List[Detection] = []
-    polygon: List[Polygon] = []
+    polygons: List[Polygon] = []
     tags: List[Tag] = []
+    attributes: Dict[str, Any] = {}
 
     class Config:
         json_loads = json_loads

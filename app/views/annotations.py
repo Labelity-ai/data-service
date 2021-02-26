@@ -41,17 +41,19 @@ class AnnotationsView:
             query=query, page_size=int(page_size), page=int(page), project=self.project)
 
     @router.post("/annotations")
-    async def add_annotations(self, annotation: ImageAnnotationsPostSchema) -> ImageAnnotations:
-        return await AnnotationsService.add_annotations(annotation, self.project.id)
+    async def add_annotations(self, annotation: ImageAnnotationsPostSchema,
+                              replace: bool = True) -> ImageAnnotations:
+        return await AnnotationsService.add_annotations(annotation, replace, self.project.id)
 
     @router.post("/annotations_bulk")
-    async def add_annotations_bulk(self, annotations: List[ImageAnnotationsPostSchema]) -> List[ImageAnnotations]:
+    async def add_annotations_bulk(self, annotations: List[ImageAnnotationsPostSchema],
+                                   replace: bool = True) -> List[ImageAnnotations]:
         if len(annotations) > Config.POST_BULK_LIMIT:
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                                 f'Payload too large. The maximum number of annotations to be'
                                 f' added in a single request is {Config.POST_BULK_LIMIT}')
 
-        return await AnnotationsService.add_annotations_bulk(annotations, self.project.id)
+        return await AnnotationsService.add_annotations_bulk(annotations, replace, self.project.id)
 
     @router.post("/annotations_file")
     async def add_annotations_file(self,
