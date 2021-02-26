@@ -61,17 +61,39 @@ class AnnotationsService:
             data=result['data'], pagination=result['metadata'][0], pipeline_id=pipeline_obj.id)
 
     @staticmethod
-    async def add_annotations(annotation: ImageAnnotationsPostSchema, project_id: ObjectId) -> ImageAnnotations:
-        result = await AnnotationsService.add_annotations_bulk([annotation], project_id)
+    async def add_annotations(annotation: ImageAnnotationsPostSchema,
+                              replace: bool, project_id: ObjectId) -> ImageAnnotations:
+        result = await AnnotationsService.add_annotations_bulk([annotation], replace, project_id)
         return result[0]
 
     @staticmethod
     async def add_annotations_bulk(annotations: List[ImageAnnotationsPostSchema],
+                                   replace: bool,
                                    project_id: ObjectId) -> List[ImageAnnotations]:
-        instances = [
-            ImageAnnotations(**annotation.dict(), project_id=project_id)
-            for annotation in annotations
-        ]
+        event_ids = [annotation.event_id for annotation in annotations]
+        instances = engine.find(ImageAnnotations, ImageAnnotations.event_id.in_(event_ids))
+        instances = {instance.event_id:instances for instance in instances}
+        result = []
+
+        for annotation in annotations:
+            instance = instances.get(annotation.event_id) or ImageAnnotations(
+                event_id=annotation.event_id, project_id=project_id)
+
+            if replace:
+                instance.detections = annotation.detections
+                instance.polygons = annotation.polygons
+                instance.points = annotation.points
+                instance.tags = annotation.tags
+                instance.polylines = annotation.polylines
+            else:
+                instance.detections += annotation.detections
+                instance.polygons += annotation.polygons
+                instance.points += annotation.points
+                instance.tags += annotation.tags
+                instance.polylines += annotation.polylines
+
+            result.append(instance)
+
         return await engine.save_all(instances)
 
     @staticmethod
