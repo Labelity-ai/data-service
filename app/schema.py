@@ -44,6 +44,8 @@ class DatasetPostSchema(SchemaBase):
 
 class DatasetGetSortQuery(Enum):
     NAME = 'name'
+    CREATED_AT = 'created_at'
+    UPDATED_AT = 'updated_at'
 
 
 class AnnotationsQueryResult(EmbeddedModel):

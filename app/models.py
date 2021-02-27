@@ -119,7 +119,8 @@ class Dataset(Model):
     description: str
     annotations: List[ObjectId]
     project_id: ObjectId
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime
+    updated_at: datetime
 
     Config = ModelConfig
 

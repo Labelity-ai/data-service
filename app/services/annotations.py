@@ -95,6 +95,7 @@ class AnnotationsService:
                 instance.tags += annotation.tags
                 instance.polylines += annotation.polylines
 
+            instance.labels = instance.get_labels()
             result.append(instance)
 
         return await engine.save_all(result)
