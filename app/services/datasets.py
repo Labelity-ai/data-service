@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 
 from fastapi import HTTPException
 from odmantic import ObjectId
@@ -6,6 +7,7 @@ from odmantic import ObjectId
 from app.schema import ImageAnnotationsPostSchema, DatasetPostSchema, DatasetGetSortQuery
 from app.models import ImageAnnotations, Dataset, Label, engine
 from app.services.annotations import AnnotationsService
+from app.core.aggregations import GET_LABELS_PIPELINE
 
 
 class DatasetService:
@@ -61,12 +63,14 @@ class DatasetService:
 
     @staticmethod
     async def create_dataset(dataset: DatasetPostSchema, project_id: ObjectId) -> Dataset:
-        instance = Dataset(**dataset.dict(), project_id=project_id)
+        now = datetime.utcnow()
+        instance = Dataset(**dataset.dict(), created_at=now, updated_at=now, project_id=project_id)
         return await engine.save(instance)
 
     @staticmethod
     async def update_dataset(dataset_id: ObjectId, dataset: DatasetPostSchema, project_id: ObjectId) -> Dataset:
-        instance = Dataset(**dataset.dict(), id=dataset_id, project_id=project_id)
+        instance = Dataset(
+            **dataset.dict(), id=dataset_id, updated_at=datetime.utcnow(), project_id=project_id)
         return await engine.save(instance)
 
     @staticmethod
@@ -74,18 +78,13 @@ class DatasetService:
                            name: Optional[str] = None,
                            sort: DatasetGetSortQuery = None) -> List[Dataset]:
         queries = [Dataset.project_id == project_id]
-
         if name:
             queries.append(Dataset.name == name)
-
-        return await engine.find(Dataset, *queries, sort=sort)
+        return await engine.find(Dataset, *queries, sort=sort.value)
 
     @staticmethod
-    async def get_dataset_labels(dataset_id: ObjectId, project_id: ObjectId) -> List[Label]:
-        annotations_list = await DatasetService.get_annotations_by_dataset_id(dataset_id, project_id)
-        labels = set()
-
-        for annotations in annotations_list:
-            labels.update(annotations.get_labels())
-
-        return list(labels)
+    async def get_dataset_labels(dataset_id: ObjectId, project_id) -> List[Label]:
+        labels_pipeline = [{'$match': {'project_id': project_id, 'dataset_id': dataset_id}}] + GET_LABELS_PIPELINE
+        collection = engine.get_collection(ImageAnnotations)
+        labels = await collection.aggregate(labels_pipeline).to_list(length=None)
+        return [Label(name=doc['name'], attributes=doc['attributes'], shape=doc['shape']) for doc in labels]
