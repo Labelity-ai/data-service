@@ -1,4 +1,4 @@
-from enum import Enum
+import os
 import boto3
 
 from app.config import Config
@@ -7,22 +7,30 @@ from app.models import ObjectId
 s3_client = boto3.client('s3')
 
 
-class Filetype(Enum):
-    IMAGE = 'image'
-    VIDEO = 'video'
-
-
 class StorageService:
     @staticmethod
-    def create_presigned_post_url(image_name: str, content_type: str,
-                                  filetype: Filetype, project_id: ObjectId) -> dict:
-        folder = 'raw' if filetype == Filetype.IMAGE else 'videos'
+    def create_presigned_post_url_for_image(image_name: str, content_type: str, project_id: ObjectId) -> dict:
         extension = content_type.split('/')[-1]
         filename = image_name if image_name.endswith(f'.{extension}') else f'{image_name}.{extension}'
 
         return s3_client.generate_presigned_post(
             Config.IMAGE_STORAGE_BUCKET,
-            f'{folder}/{project_id}/{filename}',
+            f'raw/{project_id}/{filename}',
+            Conditions=[{'Content-Type': content_type}],
+            ExpiresIn=Config.SIGNED_POST_URL_EXPIRATION
+        )
+
+    @staticmethod
+    def create_presigned_post_url_for_video(video_name: str, content_type: str,
+                                            start_sec: int, end_sec: int, fps: float,
+                                            project_id: ObjectId) -> dict:
+        extension = content_type.split('/')[-1]
+        video_name = os.path.splitext(video_name)[0]
+        filename = f'{video_name}__{start_sec}_{end_sec}_{fps}.{extension}'
+
+        return s3_client.generate_presigned_post(
+            Config.IMAGE_STORAGE_BUCKET,
+            f'{Config.VIDEOS_FOLDER}/{project_id}/{filename}',
             Conditions=[{'Content-Type': content_type}],
             ExpiresIn=Config.SIGNED_POST_URL_EXPIRATION
         )
