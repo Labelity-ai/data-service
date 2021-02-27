@@ -43,30 +43,11 @@ def _get_projection_stage(project_expr):
     }}
 
 
-class QueryStage(EmbeddedModel):
-    stage: str
-    parameters: Dict[str, Any]
-
-    @root_validator
-    def validate_root(cls, values):
-        stage = values['stage']
-
-        if stage not in STAGES:
-            raise ValueError(f'Stage {stage} is not a supported type')
-
-        return values
-
-
-class QueryPipeline(Model):
-    steps: List[QueryStage]
-    project_id: ObjectId
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    dataset_id: Optional[ObjectId] = None
-
-    Config = ModelConfig
-
-
 class Exclude(EmbeddedModel):
+    """
+    Exclude specific samples
+    """
+
     samples: List[ObjectId]
 
     def to_mongo(self):
@@ -81,6 +62,10 @@ class Exclude(EmbeddedModel):
 
 
 class Exists(EmbeddedModel):
+    """
+    Retrieve samples that has and specific field
+    """
+
     field: str
     value: bool = True
 
@@ -97,6 +82,10 @@ class Exists(EmbeddedModel):
 
 
 class Limit(EmbeddedModel):
+    """
+    Limit the number of samples to retrieve
+    """
+
     limit: int
 
     def to_mongo(self):
@@ -114,6 +103,10 @@ class Limit(EmbeddedModel):
 
 
 class Skip(EmbeddedModel):
+    """
+    Skip the N first samples
+    """
+
     skip: int
 
     def to_mongo(self):
@@ -128,6 +121,10 @@ class Skip(EmbeddedModel):
 
 
 class Take(EmbeddedModel):
+    """
+    Retrieve a random sample
+    """
+
     size: int
     seed: Optional[int] = None
 
@@ -168,6 +165,10 @@ class Match(EmbeddedModel):
 
 
 class Shuffle(EmbeddedModel):
+    """
+    Sort the samples randomly
+    """
+
     seed: Optional[int] = None
 
     def to_mongo(self):
@@ -188,6 +189,10 @@ class Shuffle(EmbeddedModel):
 
 
 class Select(EmbeddedModel):
+    """
+    Select some specific samples
+    """
+
     samples: List[ObjectId]
 
     def to_mongo(self):
@@ -218,6 +223,10 @@ class MatchTags(EmbeddedModel):
 
 
 class MapLabels(EmbeddedModel):
+    """
+    Label renaming. The labels that does not appear in the mapping dictionary will be passed through unmodified.
+    """
+
     mapping: Dict[Shape, Dict[str, str]]
 
     def to_mongo(self):
@@ -246,6 +255,11 @@ class MapLabels(EmbeddedModel):
 
 
 class SelectLabels(EmbeddedModel):
+    """
+    Select some specific labels by name.
+    If filter_empty is true, samples with no annotations after filtering will be discarded.
+    """
+
     labels: Dict[Shape, List[str]]
     filter_empty: bool = True
 
@@ -283,6 +297,13 @@ class SelectLabels(EmbeddedModel):
 
 
 class FilterLabels(EmbeddedModel):
+    """
+    Select annotations for each sample using an expression.
+    The expression will be resolved for each annotation within the specific shape type,
+    (every polygon, every tag, etc.), and if the expression resolves to true, the annotation will remain,
+    otherwise, it will be discarded.
+    """
+
     filter: QueryExpression
     shape: Shape
 
@@ -301,6 +322,10 @@ class FilterLabels(EmbeddedModel):
 
 
 class ExcludeLabels(EmbeddedModel):
+    """
+    Exclude annotations by label name.
+    """
+
     labels: Dict[Shape, List[str]]
     filter_empty: bool = True
 
@@ -336,6 +361,10 @@ class ExcludeLabels(EmbeddedModel):
 
 
 class SelectAttributes(EmbeddedModel):
+    """
+    Select some specific image-level attributes and discard the rest.
+    """
+
     attributes: List[str]
 
     def to_mongo(self):
@@ -352,6 +381,10 @@ class SelectAttributes(EmbeddedModel):
 
 
 class SelectLabelAttributes(EmbeddedModel):
+    """
+    Select some specific annotation-level attributes and discard the rest.
+    """
+
     attributes: List[str]
 
     def to_mongo(self):
@@ -368,6 +401,10 @@ class SelectLabelAttributes(EmbeddedModel):
 
 
 class ExcludeLabelAttributes(EmbeddedModel):
+    """
+    Exclude some specific annotation-level attributes and keep the rest.
+    """
+
     attributes: List[str]
 
     def to_mongo(self):
@@ -383,6 +420,10 @@ class ExcludeLabelAttributes(EmbeddedModel):
 
 
 class ExcludeAttributes(EmbeddedModel):
+    """
+    Exclude some specific image-level attributes and keep the rest.
+    """
+
     attributes: List[str]
 
     def to_mongo(self):
@@ -398,6 +439,11 @@ class ExcludeAttributes(EmbeddedModel):
 
 
 class FilterAttributes(EmbeddedModel):
+    """
+    Filter some specific image-level attributes by expression. If the expression resolves to true, the
+    attribute will remain, otherwise it will be discarded.
+    """
+
     attributes: List[str]
     filter: QueryExpression
 
@@ -422,6 +468,11 @@ class FilterAttributes(EmbeddedModel):
 
 
 class FilterLabelAttributes(EmbeddedModel):
+    """
+    Filter some specific annotation-level attributes by expression. If the expression resolves to true, the
+    attribute will remain, otherwise it will be discarded.
+    """
+
     attributes: List[str]
     filter: QueryExpression
     shape: Optional[Shape]
@@ -465,6 +516,11 @@ class FilterLabelAttributes(EmbeddedModel):
 
 
 class SortBy(EmbeddedModel):
+    """
+    Sort the samples by field or expression.
+    The expression should resolve to something sortable (bool, str or number)
+    """
+
     field_or_expression: Union[str, QueryExpression]
     reverse: bool = False
 
@@ -501,6 +557,10 @@ class SortBy(EmbeddedModel):
 
 
 class LimitLabels(EmbeddedModel):
+    """
+    Limit the number of boxes, polygons, tags, or points for an specific label.
+    """
+
     label: str
     shape: Shape
     limit: int
@@ -520,7 +580,46 @@ class LimitLabels(EmbeddedModel):
         return [{
             "$set": {
                 labels_field: {
-                    '$concatArrays': [{"$slice": [labels_expr, limit]}, other_labels_expr]
+                    '$concatArrays': [{"$slice": [labels_expr, 0, limit]}, other_labels_expr]
+                }
+            }
+        }]
+
+    def validate_stage(self, *_, **__):
+        pass
+
+    @classmethod
+    def get_json_schema(cls, project_labels: List[Label], **_):
+        labels_enum = Enum('Label', [(label.name, label.name) for label in project_labels])
+        model = create_model('LimitLabels', label=(labels_enum, ...), shape=(Shape, ...), limit=(int, ...))
+        return model.schema()
+
+
+class SkipLabels(EmbeddedModel):
+    """
+    Skip the first N boxes, polygons, tags, or points for an specific label.
+    """
+
+    label: str
+    shape: Shape
+    skip: int
+
+    def to_mongo(self):
+        skip = max(self.skip, 0)
+        labels_field = _get_annotations_field(self.shape)
+
+        labels_expr = ViewExpression(f'${labels_field}') \
+            .filter(ViewField('label') == self.label) \
+            .to_mongo()
+
+        other_labels_expr = ViewExpression(f'${labels_field}') \
+            .filter(ViewField('label') != self.label) \
+            .to_mongo()
+
+        return [{
+            "$set": {
+                labels_field: {
+                    '$concatArrays': [{"$slice": [labels_expr, skip]}, other_labels_expr]
                 }
             }
         }]
@@ -536,6 +635,10 @@ class LimitLabels(EmbeddedModel):
 
 
 class SetAttribute(EmbeddedModel):
+    """
+    Add or replace the value of an image-level attribute.
+    """
+
     attribute: str
     expression: QueryExpression
 
@@ -553,6 +656,10 @@ class SetAttribute(EmbeddedModel):
 
 
 class SetLabelAttribute(EmbeddedModel):
+    """
+    Add or replace the value of an annotation-level attribute.
+    """
+
     shape: Shape
     label: str
     attribute: str
@@ -609,3 +716,26 @@ STAGES = {
     'select_label_attributes': SelectLabelAttributes,
     'filter_label_attributes': FilterLabelAttributes,
 }
+
+
+StagesEnum = Enum('Stages', {k: k for k in STAGES.keys()})
+
+
+class QueryStage(EmbeddedModel):
+    stage: StagesEnum
+    parameters: Dict[str, Any]
+
+    @root_validator
+    def validate_root(cls, values):
+        parameters = values['parameters']
+        STAGES[values['stage']](**parameters)
+        return values
+
+
+class QueryPipeline(Model):
+    steps: List[QueryStage]
+    project_id: ObjectId
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    dataset_id: Optional[ObjectId] = None
+
+    Config = ModelConfig
