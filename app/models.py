@@ -79,6 +79,7 @@ class Label(EmbeddedModel):
 class ImageAnnotations(Model):
     event_id: str
     project_id: ObjectId
+    has_image: bool = False
 
     points: List[Keypoints] = []
     polylines: List[Polyline] = []
