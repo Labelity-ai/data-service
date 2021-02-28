@@ -147,7 +147,12 @@ class Project(Model):
     description: str
     user_id: ObjectId
     api_keys: List[str] = []
-    #updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    Config = ModelConfig
+
+
+class Image(Model):
+    event_id: str
 
     Config = ModelConfig
 
