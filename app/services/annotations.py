@@ -9,6 +9,7 @@ from app.models import ImageAnnotations, Project, engine
 from app.core.importers import DatasetImportFormat, import_dataset
 from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline, QueryPipeline
 from app.services.projects import ProjectService
+from app.services.storage import StorageService
 
 
 class AnnotationsService:
@@ -42,7 +43,7 @@ class AnnotationsService:
 
         for step in query:
             try:
-                stage = STAGES[step.stage](**step.parameters)
+                stage = STAGES[step.stage.value](**step.parameters)
                 stage.validate_stage(project_labels=project_labels, project_attributes=project_attributes)
                 pipeline.extend(stage.to_mongo())
             except ValueError as error:
@@ -52,7 +53,13 @@ class AnnotationsService:
         pipeline = make_paginated_pipeline(pipeline, page_size, page)
         collection = engine.get_collection(ImageAnnotations)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
-        print(result)
+
+        for item in result['data']:
+            if item.get(+ImageAnnotations.has_image):
+                item['thumbnail_url'] = StorageService.create_presigned_get_url_for_thumbnail(
+                    item['event_id'], project.id)
+                item['image_url'] = StorageService.create_presigned_get_url_for_image(
+                    item['event_id'], project.id)
 
         pipeline_obj = QueryPipeline(steps=query, project_id=project.id)
         pipeline_obj = await engine.save(pipeline_obj)

@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 
 from pymongo import ASCENDING, DESCENDING
+from aenum import extend_enum
 
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
@@ -718,7 +719,12 @@ STAGES = {
 }
 
 
-StagesEnum = Enum('Stages', {k: k for k in STAGES.keys()})
+class StagesEnum(str, Enum):
+    pass
+
+
+for stage in STAGES.keys():
+    extend_enum(StagesEnum, stage, stage)
 
 
 class QueryStage(EmbeddedModel):
@@ -728,7 +734,8 @@ class QueryStage(EmbeddedModel):
     @root_validator
     def validate_root(cls, values):
         parameters = values['parameters']
-        STAGES[values['stage']](**parameters)
+        stage = values['stage'].value
+        STAGES[stage](**parameters)
         return values
 
 

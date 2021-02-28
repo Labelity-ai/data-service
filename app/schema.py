@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from fastapi_utils.camelcase import snake2camel
 
 from app.utils import json_dumps, json_loads
-from app.models import Polyline, Detection, Polygon, Tag, ImageAnnotations,\
-    EmbeddedModel, ModelConfig, ObjectId
+from app.models import Polyline, Detection, Polygon, Tag,\
+    EmbeddedModel, ModelConfig, ObjectId, Keypoints, Label
 
 
 class SchemaBase(BaseModel):
@@ -20,7 +20,7 @@ class SchemaBase(BaseModel):
 class ImageAnnotationsPostSchema(SchemaBase):
     event_id: str
 
-    points: List[Polyline] = []
+    points: List[Keypoints] = []
     polylines: List[Polyline] = []
     detections: List[Detection] = []
     polygons: List[Polygon] = []
@@ -30,6 +30,20 @@ class ImageAnnotationsPostSchema(SchemaBase):
     class Config:
         json_loads = json_loads
         json_dumps = json_dumps
+
+
+class ImageAnnotationsData(SchemaBase):
+    event_id: str
+    thumbnail_url: str = None
+    image_url: str = None
+
+    points: List[Keypoints] = []
+    polylines: List[Polyline] = []
+    detections: List[Detection] = []
+    polygons: List[Polygon] = []
+    tags: List[Tag] = []
+    attributes: Dict[str, Any] = {}
+    labels: List[Label] = []
 
 
 class ProjectPostSchema(SchemaBase):
@@ -53,7 +67,7 @@ class AnnotationsQueryResult(EmbeddedModel):
         page: int
         total: int
 
-    data: List[ImageAnnotations]
+    data: List[ImageAnnotationsData]
     pagination: Pagination
     pipeline_id: Optional[ObjectId] = None
 
