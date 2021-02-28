@@ -8,7 +8,7 @@ from urllib.parse import unquote_plus
 s3_fs = s3fs.S3FileSystem()
 
 
-def handler(event, context):
+def main(event, context):
     for record in event['Records']:
         bucket = record['s3']['bucket']['name']
         key = unquote_plus(record['s3']['object']['key'])
@@ -40,4 +40,4 @@ def handler(event, context):
 
 
 if __name__ == '__main__':
-    handler(None, None)
+    main(None, None)

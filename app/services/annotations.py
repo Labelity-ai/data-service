@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from odmantic import ObjectId
 
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult
-from app.models import ImageAnnotations, Project, engine
+from app.models import ImageAnnotations, Project, engine, Image
 from app.core.importers import DatasetImportFormat, import_dataset
 from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline, QueryPipeline
 from app.services.projects import ProjectService
@@ -81,6 +81,10 @@ class AnnotationsService:
         previous_instances = await engine.find(
             ImageAnnotations, ImageAnnotations.event_id.in_(event_ids))
         event_id_to_instance = {ins.event_id: ins for ins in previous_instances}
+
+        images = engine.find(Image, Image.event_id.in_(event_ids))
+        images = {ins.event_id: True for ins in images}
+
         result = []
 
         for annotation in annotations:
@@ -102,6 +106,7 @@ class AnnotationsService:
                 instance.tags += annotation.tags
                 instance.polylines += annotation.polylines
 
+            instance.has_image = images.get(annotation.event_id, False)
             instance.labels = instance.get_labels()
             result.append(instance)
 
