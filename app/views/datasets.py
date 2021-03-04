@@ -3,14 +3,14 @@ from typing import List
 from fastapi_utils.api_model import APIMessage
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Response
 from odmantic import ObjectId
 
 from app.schema import DatasetPostSchema, DatasetGetSortQuery, ImageAnnotationsPostSchema
 from app.models import Dataset, ImageAnnotations, Label, Project
 from app.security import get_project
 from app.config import Config
-from app.services.datasets import DatasetService
+from app.services.datasets import DatasetService, DatasetExportingStatus, DatasetExportFormat
 
 router = InferringRouter(
     tags=["datasets"],
@@ -62,3 +62,21 @@ class DatasetsView:
     @router.get("/dataset/{id}/labels")
     async def get_dataset_labels(self, id: ObjectId) -> List[Label]:
         return await DatasetService.get_dataset_labels(id, self.project.id)
+
+    @router.get("/dataset/{id}/download")
+    async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> APIMessage:
+        export_status = await DatasetService.download_dataset(format, id, self.project.id)
+
+        if export_status == DatasetExportingStatus.STARTED:
+            response.status_code = status.HTTP_202_ACCEPTED
+            return APIMessage(detail='Starting dataset exporting')
+        elif export_status == DatasetExportingStatus.QUEUED:
+            response.status_code = status.HTTP_202_ACCEPTED
+            return APIMessage(detail='Dataset exporting in progress')
+        elif export_status == DatasetExportingStatus.FINISHED:
+            url = await DatasetService.get_dataset_download_url(id, self.project.id)
+            return APIMessage(detail=url)
+
+    @router.get("/dataset/formats")
+    async def get_export_formats(self) -> List[str]:
+        return [x.value for x in DatasetExportFormat]

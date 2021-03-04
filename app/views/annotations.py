@@ -86,3 +86,7 @@ class AnnotationsView:
     @router.get("/annotations/meta/stages")
     async def get_annotations_stages(self) -> Dict[str, dict]:
         return await AnnotationsService.get_stages_schema(self.project.id)
+
+    @router.get("/annotations_file/formats")
+    async def get_export_formats(self) -> List[str]:
+        return [x.value for x in DatasetImportFormat]
