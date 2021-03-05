@@ -71,7 +71,7 @@ class AnnotationsView:
                 temp_file.flush()
                 print(temp_file.name)
                 return await AnnotationsService.add_annotations_file(
-                    Path(temp_file.name), annotations_format, self.project.id)
+                    temp_file.name, annotations_format, self.project.id)
 
     @router.patch("/annotations/{id}")
     async def update_annotations(self, id: ObjectId,

@@ -7,7 +7,7 @@ import pymongo
 from PIL import Image
 
 MONGO_CLIENT = pymongo.MongoClient(
-    os.environ['MONGO_SRV_URI'],
+    os.environ['MONGO_URI'],
     int(os.environ.get('MONGO_PORT', 27017))
 )
 
@@ -24,7 +24,7 @@ def create_thumbnail(bucket_name, input_key, output_key, max_width, max_height):
     obj_body = obj.get()['Body'].read()
 
     img = Image.open(BytesIO(obj_body))
-    img = img.resize((max_width, max_height), Image.ANTIALIAS)
+    img.thumbnail((max_width, max_height))
     buffer = BytesIO()
     img.save(buffer, 'JPEG')
     buffer.seek(0)
@@ -50,15 +50,15 @@ def update_database(event_id: str, value: bool):
 def main(event, context):
     for record in event['Records']:
         thumbnails_folder = os.environ['THUMBNAILS_FOLDER']
-        max_width = int(os.environ['MAX_WIDTH'])
-        max_height = int(os.environ['MAX_HEIGHT'])
+        max_width = int(os.environ['THUMBNAILS_MAX_HEIGHT'])
+        max_height = int(os.environ['THUMBNAILS_MAX_HEIGHT'])
 
         bucket = record['s3']['bucket']['name']
         key = unquote_plus(record['s3']['object']['key'])
-        project_id, filename = key.split()[-2:]
+        project_id, filename = key.split('/')[-2:]
         thumbnail_key = f'{thumbnails_folder}/{project_id}/{filename}'
 
-        is_object_creation = event['eventName'].startswith('ObjectCreated')
+        is_object_creation = record['eventName'].startswith('ObjectCreated')
 
         if is_object_creation:
             create_thumbnail(bucket, key, thumbnail_key, max_width, max_height)

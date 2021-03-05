@@ -1,5 +1,4 @@
 from typing import List
-from pathlib import Path
 
 from fastapi import HTTPException
 from odmantic import ObjectId
@@ -64,8 +63,11 @@ class AnnotationsService:
         pipeline_obj = QueryPipeline(steps=query, project_id=project.id)
         pipeline_obj = await engine.save(pipeline_obj)
 
+        pagination = result['metadata'][0] if result['metadata'] else {'page': 0, 'total': 0}
+        data = result['data']
+
         return AnnotationsQueryResult(
-            data=result['data'], pagination=result['metadata'][0], pipeline_id=pipeline_obj.id)
+            data=data, pagination=pagination, pipeline_id=pipeline_obj.id)
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema,
@@ -125,7 +127,7 @@ class AnnotationsService:
         await engine.delete(annotations)
 
     @staticmethod
-    async def add_annotations_file(file: Path,
+    async def add_annotations_file(file: str,
                                    annotations_format: DatasetImportFormat,
                                    project_id: ObjectId):
         annotations = import_dataset(file, annotations_format, project_id)
