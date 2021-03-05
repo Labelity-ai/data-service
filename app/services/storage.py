@@ -37,7 +37,7 @@ class StorageService:
 
     @staticmethod
     def create_presigned_get_url_for_thumbnail(event_id: str, project_id: ObjectId) -> str:
-        return s3_client.gnerate_presigned_url(
+        return s3_client.generate_presigned_url(
             'get_object',
             ExpiresIn=Config.SIGNED_GET_THUMBNAIL_URL_EXPIRATION,
             Params={
@@ -48,11 +48,22 @@ class StorageService:
 
     @staticmethod
     def create_presigned_get_url_for_image(event_id: str, project_id: ObjectId) -> str:
-        return s3_client.gnerate_presigned_url(
+        return s3_client.generate_presigned_url(
             'get_object',
             ExpiresIn=Config.SIGNED_GET_IMAGE_URL_EXPIRATION,
             Params={
                 'Bucket': Config.IMAGE_STORAGE_BUCKET,
                 'Key': f'{Config.RAW_IMAGES_FOLDER}/{project_id}/{event_id}'
+            },
+        )
+
+    @staticmethod
+    def create_presigned_get_url_for_object_download(key: str) -> str:
+        return s3_client.generate_presigned_url(
+            'get_object',
+            ExpiresIn=Config.SIGNED_GET_OBJECT_URL_EXPIRATION,
+            Params={
+                'Bucket': Config.IMAGE_STORAGE_BUCKET,
+                'Key': key,
             },
         )
