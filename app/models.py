@@ -49,13 +49,13 @@ class Keypoints(Prediction):
 
 
 class Polygon(Prediction):
-    points: List[Tuple[float, float]]
+    points: List[float]
 
     _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
 class Polyline(Prediction):
-    points: List[Tuple[float, float]]
+    points: List[float]
 
     _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
@@ -162,7 +162,7 @@ class QueryExpression(BaseModel):
     literal: Union[int, float, str, None]
     operator: Optional[str]
     parameters: Dict[str, Union[float, QueryExpression, str]] = {}
-    #created_at: datetime = Field(default_factory=datetime.utcnow)
+    # created_at: datetime = Field(default_factory=datetime.utcnow)
 
     Config = ModelConfig
 
@@ -171,3 +171,7 @@ QueryExpression.update_forward_refs()
 
 client = AsyncIOMotorClient(Config.MONGO_HOST)
 engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
+
+
+async def initialize():
+    await engine.get_collection(ImageAnnotations).create_index('event_id', unique=True)
