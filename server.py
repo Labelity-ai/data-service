@@ -13,3 +13,9 @@ app.include_router(annotations_router)
 app.include_router(projects_router)
 app.include_router(datasets_router)
 app.include_router(storage_router)
+
+
+@app.on_event("startup")
+async def startup_event():
+    from app.models import initialize
+    await initialize()
