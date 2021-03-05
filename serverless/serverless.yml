@@ -15,6 +15,8 @@ custom:
   bucket: labelity-use-${self:custom.stage}-images
   pythonRequirements:
     dockerizePip: true
+    useStaticCache: false
+    useDownloadCache: false
   stages:
     - ${opt:stage}
     - dev
