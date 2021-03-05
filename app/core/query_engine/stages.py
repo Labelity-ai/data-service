@@ -49,10 +49,10 @@ class Exclude(EmbeddedModel):
     Exclude specific samples
     """
 
-    samples: List[ObjectId]
+    samples: List[str]
 
     def to_mongo(self):
-        return [{'$match': {'_id': {'$not': {'$in': self.samples}}}}]
+        return [{'$match': {+ImageAnnotations.event_id: {'$not': {'$in': self.samples}}}}]
 
     def validate_stage(self, *_, **__):
         pass
@@ -194,10 +194,10 @@ class Select(EmbeddedModel):
     Select some specific samples
     """
 
-    samples: List[ObjectId]
+    samples: List[str]
 
     def to_mongo(self):
-        return [{'$match': {'_id': {'$in': self.samples}}}]
+        return [{'$match': {+ImageAnnotations.event_id: {'$in': self.samples}}}]
 
     def validate_stage(self, *_, **__):
         pass
