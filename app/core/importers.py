@@ -33,7 +33,7 @@ def _normalize_points(points, item: DatasetItem):
     return result
 
 
-def import_dataset(input_file: Path, format: DatasetImportFormat, project_id: ObjectId):
+def import_dataset(input_file: str, format: DatasetImportFormat, project_id: ObjectId):
     dataset = Dataset.import_from(input_file, format=format.value)
     labels = dataset.categories()
     annotations = []
