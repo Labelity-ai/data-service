@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+node_modules
+.serverless
+admin.env
+_meta
+
+#OS STUFF
+.DS_Store
+.tmp

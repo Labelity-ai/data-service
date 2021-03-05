@@ -1,0 +1,90 @@
+service: ${self:custom.serviceName}
+app: data-service
+
+plugins:
+  - serverless-s3-local
+  - serverless-offline
+  - serverless-python-requirements
+
+frameworkVersion: '2'
+
+custom:
+  serviceName: image-optimization
+  stage: ${opt:stage, self:custom.defaultStage}
+  defaultStage: dev
+  bucket: labelity-use-${self:custom.stage}-images
+  pythonRequirements:
+    dockerizePip: true
+  stages:
+    - ${opt:stage}
+    - dev
+    - integration
+    - production
+
+provider:
+  name: aws
+  runtime: python3.7
+  lambdaHashingVersion: 20201221
+  region: us-east-1
+
+  usagePlan:
+    quota:
+      limit: 100
+      offset: 2
+      period: MONTH
+    throttle:
+      burstLimit: 100
+      rateLimit: 50
+
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:ListBucket"
+      Resource: arn:aws:s3:::${self:custom.bucket}/*
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource: arn:aws:s3:::${self:custom.bucket}/raw/*
+    - Effect: "Allow"
+      Action:
+        - "s3:PutObject"
+        - "s3:GetObject"
+      Resource: arn:aws:s3:::${self:custom.bucket}/thumbnails/*
+    - Effect: "Allow"
+      Action:
+        - "s3:DeleteObject"
+        - "s3:GetObject"
+      Resource: arn:aws:s3:::${self:custom.bucket}/videos/*
+
+package:
+  individually: true
+
+functions:
+  optimize:
+    handler: handler.main
+    module: image_processor
+    memorySize: 256
+    package: { }
+    environment: ${file(env.${opt:stage, self:provider.stage}.json)}
+    events:
+      - s3:
+          bucket: ${self:custom.bucket}
+          event: s3:ObjectRemoved:*
+          rules:
+            - prefix: raw/
+      - s3:
+          bucket: ${self:custom.bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: raw/
+  video_to_frames:
+    handler: handler.main
+    module: video_processor
+    memorySize: 512
+    environment: ${file(env.${opt:stage, self:provider.stage}.json)}
+    events:
+      - s3:
+          bucket: ${self:custom.bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: videos/
