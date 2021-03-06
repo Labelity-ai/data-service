@@ -5,6 +5,7 @@ plugins:
   - serverless-s3-local
   - serverless-offline
   - serverless-python-requirements
+  - serverless-plugin-lambda-insights
 
 frameworkVersion: '2'
 
@@ -66,6 +67,7 @@ functions:
     handler: handler.main
     module: image_processor
     memorySize: 256
+    lambdaInsights: true
     package: { }
     environment: ${file(env.${opt:stage, self:provider.stage}.json)}
     events:
@@ -82,6 +84,7 @@ functions:
   video_to_frames:
     handler: handler.main
     module: video_processor
+    lambdaInsights: true
     memorySize: 512
     environment: ${file(env.${opt:stage, self:provider.stage}.json)}
     events:
