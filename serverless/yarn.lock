@@ -2189,6 +2189,11 @@ serverless-offline@^6.5.0:
     velocityjs "^2.0.0"
     ws "^7.2.1"
 
+serverless-plugin-lambda-insights@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/serverless-plugin-lambda-insights/-/serverless-plugin-lambda-insights-1.0.1.tgz#16d76a9cfffb8d9d80e51076c727903d464fadf9"
+  integrity sha512-fJvJQ09cwbGjuyfTo0Y701/h5iew4z2qmQJeRL93uyXvwNPQWK/QKHmBL240sFHdkwPRTJEwfKLmiBk1MejgFQ==
+
 serverless-python-requirements@^5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/serverless-python-requirements/-/serverless-python-requirements-5.1.0.tgz#5ce0ee1158429c8304a45a753100511517ea8fa9"
