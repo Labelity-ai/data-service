@@ -3,13 +3,14 @@ import random
 from datetime import datetime
 from enum import Enum
 
+from odmantic import Field
 from pymongo import ASCENDING, DESCENDING
 from aenum import extend_enum
 
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
 from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations, \
-    Shape, Model, ModelConfig, Label, Field
+    Shape, Model, ModelConfig, Label
 from pydantic import root_validator, create_model
 
 
