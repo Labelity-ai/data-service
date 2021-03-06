@@ -84,7 +84,7 @@ class AnnotationsService:
             ImageAnnotations, ImageAnnotations.event_id.in_(event_ids))
         event_id_to_instance = {ins.event_id: ins for ins in previous_instances}
 
-        images = engine.find(Image, Image.event_id.in_(event_ids))
+        images = await engine.find(Image, Image.event_id.in_(event_ids))
         images = {ins.event_id: True for ins in images}
 
         result = []
@@ -129,9 +129,10 @@ class AnnotationsService:
     @staticmethod
     async def add_annotations_file(file: str,
                                    annotations_format: DatasetImportFormat,
+                                   replace: bool,
                                    project_id: ObjectId):
         annotations = import_dataset(file, annotations_format, project_id)
-        return await engine.save_all(annotations)
+        return await AnnotationsService.add_annotations_bulk(annotations, replace, project_id)
 
     @staticmethod
     async def get_stages_schema(project_id: ObjectId):

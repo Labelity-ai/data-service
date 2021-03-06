@@ -58,6 +58,7 @@ class AnnotationsView:
     @router.post("/annotations_file")
     async def add_annotations_file(self,
                                    annotations_format: DatasetImportFormat,
+                                   replace: bool,
                                    file: UploadFile = File(...)) -> List[ImageAnnotations]:
         if file.content_type not in ['application/xml', 'application/json', 'text/xml']:
             raise HTTPException(status.HTTP_400_BAD_REQUEST,
@@ -71,7 +72,7 @@ class AnnotationsView:
                 temp_file.flush()
                 print(temp_file.name)
                 return await AnnotationsService.add_annotations_file(
-                    temp_file.name, annotations_format, self.project.id)
+                    temp_file.name, annotations_format, replace, self.project.id)
 
     @router.patch("/annotations/{id}")
     async def update_annotations(self, id: ObjectId,
