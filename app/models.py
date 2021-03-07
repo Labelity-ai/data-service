@@ -168,7 +168,7 @@ class Image(Model):
 class FastToken(Model):
     is_active: bool = True
     creation_date: datetime
-    timestamp = datetime
+    timestamp: datetime
     dataset_id: ObjectId
     project_id: ObjectId
 
