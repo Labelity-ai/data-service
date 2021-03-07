@@ -1,8 +1,8 @@
 from enum import Enum
 from datumaro.components.dataset import Dataset, DatasetItem, AnnotationType
-from pathlib import Path
+from datumaro.components.extractor import Caption as DatumaroCaption
 from app.models import ImageAnnotations, Tag, Polygon, Detection,\
-    Polyline, Keypoints, ObjectId
+    Polyline, Keypoints, ObjectId, Caption
 
 
 class DatasetImportFormat(Enum):
@@ -41,10 +41,17 @@ def import_dataset(input_file: str, format: DatasetImportFormat, project_id: Obj
     for row in dataset:
         item: DatasetItem = row
         event_id = item.image.path.split('/')[-1] if item.has_image else item.id
-        tags, detections, polygons, polylines, keypoints = [], [], [], [], []
+        tags, detections, polygons, polylines, captions, keypoints = [], [], [], [], [], []
 
         for annotation in item.annotations:
-            # TODO: Fix this
+            if isinstance(annotation, DatumaroCaption):
+                captions.append(Caption(
+                    caption=annotation.caption,
+                    attributes=annotation.attributes
+                ))
+                continue
+
+            # TODO: Add support for segmentation masks
             label = labels[AnnotationType.label][annotation.label]
 
             if annotation.type == AnnotationType.label:
@@ -86,6 +93,7 @@ def import_dataset(input_file: str, format: DatasetImportFormat, project_id: Obj
             polylines=polylines,
             points=keypoints,
             project_id=project_id,
+            captions=captions,
             labels=[]
         )
 
