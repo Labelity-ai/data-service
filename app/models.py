@@ -4,7 +4,7 @@ import enum
 from collections import defaultdict
 from datetime import datetime
 
-from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine, Field
+from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine, Reference
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import validator, BaseModel
 
@@ -60,6 +60,13 @@ class Polyline(Prediction):
     _normalize_points = validator('points', allow_reuse=True)(check_relative_points)
 
 
+class Caption(EmbeddedModel):
+    caption: str
+    attributes: Dict[str, Any] = {}
+
+    Config = ModelConfig
+
+
 class Shape(str, enum.Enum):
     BOX = 'box'
     TAG = 'tag'
@@ -86,6 +93,7 @@ class ImageAnnotations(Model):
     detections: List[Detection] = []
     polygons: List[Polygon] = []
     tags: List[Tag] = []
+    captions: List[Caption] = []
     attributes: Dict[str, Any] = {}
     labels: List[Label] = []
 
@@ -118,7 +126,7 @@ class ImageAnnotations(Model):
 class Dataset(Model):
     name: str
     description: str
-    annotations: List[ObjectId]
+    event_ids: List[str] = []
     project_id: ObjectId
     created_at: datetime
     updated_at: datetime
@@ -157,6 +165,16 @@ class Image(Model):
     Config = ModelConfig
 
 
+class FastToken(Model):
+    is_active: bool = True
+    creation_date: datetime
+    timestamp = datetime
+    dataset_id: ObjectId
+    project_id: ObjectId
+
+    Config = ModelConfig
+
+
 class QueryExpression(BaseModel):
     field: Optional[str]
     literal: Union[int, float, str, None]
@@ -174,4 +192,7 @@ engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
 
 
 async def initialize():
+    await engine.get_collection(Project).create_index('user_id')
+    await engine.get_collection(Dataset).create_index('project_id')
+    await engine.get_collection(ImageAnnotations).create_index('project_id')
     await engine.get_collection(ImageAnnotations).create_index('event_id', unique=True)
