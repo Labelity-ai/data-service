@@ -6,14 +6,13 @@ import cloudpickle
 from fastapi import HTTPException
 from odmantic import ObjectId
 import s3fs
-from jose import jwt
 
-from app.schema import DatasetPostSchema, DatasetGetSortQuery
+from app.schema import DatasetPostSchema, DatasetGetSortQuery, DatasetToken
 from app.models import ImageAnnotations, Dataset, Label, engine, FastToken
 from app.services.storage import StorageService
 from app.core.aggregations import GET_LABELS_PIPELINE
 from app.core.exporters import create_datumaro_dataset, DatasetExportFormat
-from app.security import create_jwt_token
+from app.security import create_fast_jwt_token
 from app.config import Config
 
 s3_fs = s3fs.S3FileSystem()
@@ -156,4 +155,5 @@ class DatasetService:
             dataset_id=dataset.id,
             project_id=dataset.project_id
         ))
-        return create_jwt_token({'sub': token.id}, expires_delta)
+        token = create_fast_jwt_token({'sub': str(token.id)}, expires_delta)
+        return DatasetToken(token=token)

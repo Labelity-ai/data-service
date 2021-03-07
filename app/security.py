@@ -29,14 +29,14 @@ credentials_exception = HTTPException(
 
 async def get_dataset_token(token: str):
     try:
-        payload = jwt.decode(token, Config.SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
+        payload = jwt.decode(token, Config.SECRET_KEY, algorithms=[Config.FAST_TOKEN_JWT_ALGORITHM])
         token_id: str = payload.get("sub")
         if token_id is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    token = await engine.find_one(FastToken, FastToken.id == token_id)
+    token = await engine.find_one(FastToken, FastToken.id == ObjectId(token_id))
 
     if token is None:
         raise credentials_exception
@@ -84,14 +84,14 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 
-async def create_jwt_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_fast_jwt_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(hours=Config.DATASET_TOKEN_DEFAULT_TIMEDELTA_HOURS)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, Config.SECRET_KEY, algorithm=Config.JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, Config.SECRET_KEY, algorithm=Config.FAST_TOKEN_JWT_ALGORITHM)
     return encoded_jwt
 
 

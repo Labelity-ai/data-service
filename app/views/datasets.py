@@ -6,7 +6,7 @@ from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, Response
 from odmantic import ObjectId
 
-from app.schema import DatasetPostSchema, DatasetGetSortQuery, ImageAnnotationsPostSchema
+from app.schema import DatasetPostSchema, DatasetGetSortQuery, ImageAnnotationsPostSchema, DatasetToken
 from app.models import Dataset, ImageAnnotations, Label, Project, FastToken
 from app.security import get_project, get_dataset_token
 from app.config import Config
@@ -126,9 +126,9 @@ class DatasetsView:
         return await DatasetsViewBase.get_dataset_labels(id, self.project.id)
 
     @router.post("/dataset/{id}/token")
-    async def create_dataset_access_token(self, id: ObjectId) -> List[Label]:
-        dataset = await DatasetsView.get_dataset_by_id(id)
-        return await DatasetService.create_access_token(dataset, self.project.id)
+    async def create_dataset_access_token(self, id: ObjectId) -> DatasetToken:
+        dataset = await self.get_dataset_by_id(id)
+        return await DatasetService.create_access_token(dataset)
 
     @router.get("/dataset/{id}/download")
     async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> APIMessage:
@@ -153,29 +153,29 @@ class DatasetsView:
 class DatasetsSharedView:
     dataset_token: FastToken = Depends(get_dataset_token)
 
-    @router.get("/dataset/shared")
+    @router.get("/dataset_shared")
     async def get_dataset(self) -> Dataset:
         return await DatasetsViewBase.get_dataset_by_id(
             self.dataset_token.dataset_id, self.dataset_token.project_id)
 
-    @router.get("/dataset/shared/annotations")
+    @router.get("/dataset_shared/annotations")
     async def get_annotations_by_dataset_id(self) -> List[ImageAnnotations]:
         return await DatasetsViewBase.get_annotations_by_dataset_id(
             self.dataset_token.dataset_id, self.dataset_token.project_id
         )
 
-    @router.get("/dataset/shared/labels")
+    @router.get("/dataset_shared/labels")
     async def get_dataset_labels(self) -> List[Label]:
         return await DatasetsViewBase.get_dataset_labels(
             self.dataset_token.dataset_id, self.dataset_token.project_id
         )
 
-    @router.get("/dataset/shared/download")
+    @router.get("/dataset_shared/download")
     async def download_dataset(self, format: DatasetExportFormat, response: Response) -> APIMessage:
         return await DatasetsViewBase.download_dataset(
             self.dataset_token.dataset_id, self.dataset_token.project_id, format, response
         )
 
-    @router.get("/dataset/shared/formats")
+    @router.get("/dataset_shared/formats")
     def get_export_formats(self) -> List[str]:
         return DatasetsViewBase.get_export_formats()
