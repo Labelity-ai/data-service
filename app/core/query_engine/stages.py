@@ -208,20 +208,31 @@ class Select(EmbeddedModel):
         return cls.schema()
 
 
-class MatchTags(EmbeddedModel):
-    tags: List[str]
+class SelectGroup(EmbeddedModel):
+    """
+    Select all annotations from an specific group
+    If filter_empty is true, samples with no annotations after filtering will be discarded.
+    """
+    group: str
+    filter_empty: bool = True
 
     def to_mongo(self):
-        expr = ViewField('tags').is_in(self.tags)
-        return [{"$match": {'$expr': expr.to_mongo()}}]
+        filters = {}
+
+        for shape in Shape:
+            filters[shape] = ViewField('group') == self.group
+
+        return FilterLabels(filters=filters, filter_empty=self.filter_empty)
 
     def validate_stage(self, *_, **__):
         pass
 
     @classmethod
-    def get_json_schema(cls, **_):
-        # TODO: Convert tags to list of enums
-        return cls.schema()
+    def get_json_schema(cls, project_labels: List[Label], **_):
+        label_names = set(label.name for label in project_labels)
+        labels_enum = Enum('Label', [(name, name) for name in label_names])
+        model = create_model('SelectLabels', labels=(List[labels_enum], ...), shape=(Shape, ...))
+        return model.schema()
 
 
 class MapLabels(EmbeddedModel):
@@ -266,34 +277,20 @@ class SelectLabels(EmbeddedModel):
     filter_empty: bool = True
 
     def to_mongo(self):
-        if not self.labels:
-            return []
-
-        project_result = {}
-        is_empty_expr = ViewExpression(False)
-
-        for shape in Shape:
-            field = _get_annotations_field(shape)
-            is_empty_expr = is_empty_expr | (ViewField(field).length() > 0)
+        filters = {}
 
         for shape, labels in self.labels.items():
-            field = _get_annotations_field(shape)
-            project_result[field] = ViewField(f'${field}').filter(ViewField('label').is_in(labels)).to_mongo()
+            filters[shape] = ViewField('label').is_in(labels)
 
-        if not self.filter_empty:
-            return [_get_projection_stage(project_result)]
-        else:
-            return [
-                _get_projection_stage(project_result),
-                {"$match": {"$expr": is_empty_expr.to_mongo()}}
-            ]
+        return FilterLabels(filters=filters, filter_empty=self.filter_empty).to_mongo()
 
     def validate_stage(self, *_, **__):
         pass
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
-        labels_enum = Enum('Label', [(label.name, label.name) for label in project_labels])
+        label_names = set(label.name for label in project_labels)
+        labels_enum = Enum('Label', [(name, name) for name in label_names])
         model = create_model('SelectLabels', labels=(List[labels_enum], ...), shape=(Shape, ...))
         return model.schema()
 
@@ -306,14 +303,32 @@ class FilterLabels(EmbeddedModel):
     otherwise, it will be discarded.
     """
 
-    filter: QueryExpression
-    shape: Shape
+    filters: Dict[Shape, QueryExpression]
+    filter_empty: bool = True
 
     def to_mongo(self):
-        field = _get_annotations_field(self.shape)
-        filter_expr = construct_view_expression(self.filter)
-        project = {field: ViewField(f'${field}').filter(filter_expr)}
-        return [_get_projection_stage(project)]
+        if not self.labels:
+            return []
+
+        project_result = {}
+        is_empty_expr = ViewExpression(False)
+
+        for shape in Shape:
+            field = _get_annotations_field(shape)
+            is_empty_expr = is_empty_expr | (ViewField(field).length() > 0)
+
+        for shape, expression in self.filters.items():
+            field = _get_annotations_field(shape)
+            expr = construct_view_expression(expression)
+            project_result[field] = ViewField(f'${field}').filter(expr).to_mongo()
+
+        if not self.filter_empty:
+            return [_get_projection_stage(project_result)]
+        else:
+            return [
+                _get_projection_stage(project_result),
+                {"$match": {"$expr": is_empty_expr.to_mongo()}}
+            ]
 
     def validate_stage(self, *_, **__):
         pass
@@ -332,32 +347,20 @@ class ExcludeLabels(EmbeddedModel):
     filter_empty: bool = True
 
     def to_mongo(self):
-        project_result = {}
-        is_empty_expr = ViewExpression(False)
-
-        for shape in Shape:
-            field = _get_annotations_field(shape)
-            is_empty_expr = is_empty_expr | (ViewField(field).length() > 0)
-            project_result[field] = 1
+        filters = {}
 
         for shape, labels in self.labels.items():
-            field = _get_annotations_field(shape)
-            project_result[field] = ViewField(f'${field}').filter(~ViewField('label').is_in(labels)).to_mongo()
+            filters[shape] = ~ViewField('label').is_in(labels)
 
-        if not self.filter_empty:
-            return [_get_projection_stage(project_result)]
-        else:
-            return [
-                _get_projection_stage(project_result),
-                {"$match": {"$expr": is_empty_expr.to_mongo()}}
-            ]
+        return FilterLabels(filters=filters, filter_empty=self.filter_empty).to_mongo()
 
     def validate_stage(self, *_, **__):
         pass
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
-        labels_enum = Enum('Labels', [(label.name, label.name) for label in project_labels])
+        label_names = set(label.name for label in project_labels)
+        labels_enum = Enum('Label', [(name, name) for name in label_names])
         model = create_model('ExcludeLabels', shape=(Shape, ...), labels=(List[labels_enum], ...))
         return model.schema()
 
@@ -379,7 +382,9 @@ class SelectAttributes(EmbeddedModel):
 
     @classmethod
     def get_json_schema(cls, *args, **kwargs):
-        return FilterAttributes.get_json_schema(*args, **kwargs)
+        schema = FilterAttributes.get_json_schema(*args, **kwargs)
+        schema['title'] = 'SelectAttributes'
+        return schema
 
 
 class SelectLabelAttributes(EmbeddedModel):
@@ -399,7 +404,9 @@ class SelectLabelAttributes(EmbeddedModel):
 
     @classmethod
     def get_json_schema(cls, *args, **kwargs):
-        return FilterLabelAttributes.get_json_schema(*args, **kwargs)
+        schema = FilterLabelAttributes.get_json_schema(*args, **kwargs)
+        schema['title'] = 'SelectLabelAttributes'
+        return schema
 
 
 class ExcludeLabelAttributes(EmbeddedModel):
@@ -418,7 +425,9 @@ class ExcludeLabelAttributes(EmbeddedModel):
 
     @classmethod
     def get_json_schema(cls, *args, **kwargs):
-        return FilterLabelAttributes.get_json_schema(*args, **kwargs)
+        schema = FilterLabelAttributes.get_json_schema(*args, **kwargs)
+        schema['title'] = 'ExcludeLabelAttributes'
+        return schema
 
 
 class ExcludeAttributes(EmbeddedModel):
@@ -437,7 +446,9 @@ class ExcludeAttributes(EmbeddedModel):
 
     @classmethod
     def get_json_schema(cls, *args, **kwargs):
-        return FilterAttributes.get_json_schema(*args, **kwargs)
+        schema = FilterLabelAttributes.get_json_schema(*args, **kwargs)
+        schema['title'] = 'ExcludeAttributes'
+        return schema
 
 
 class FilterAttributes(EmbeddedModel):
@@ -592,7 +603,8 @@ class LimitLabels(EmbeddedModel):
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
-        labels_enum = Enum('Label', [(label.name, label.name) for label in project_labels])
+        label_names = set(label.name for label in project_labels)
+        labels_enum = Enum('Label', [(name, name) for name in label_names])
         model = create_model('LimitLabels', label=(labels_enum, ...), shape=(Shape, ...), limit=(int, ...))
         return model.schema()
 
@@ -631,8 +643,9 @@ class SkipLabels(EmbeddedModel):
 
     @classmethod
     def get_json_schema(cls, project_labels: List[Label], **_):
-        labels_enum = Enum('Label', [(label.name, label.name) for label in project_labels])
-        model = create_model('LimitLabels', label=(labels_enum, ...), shape=(Shape, ...), limit=(int, ...))
+        label_names = set(label.name for label in project_labels)
+        labels_enum = Enum('Label', [(name, name) for name in label_names])
+        model = create_model('SkipLabels', label=(labels_enum, ...), shape=(Shape, ...), limit=(int, ...))
         return model.schema()
 
 
@@ -684,10 +697,22 @@ class SetLabelAttribute(EmbeddedModel):
 
 
 def make_paginated_pipeline(pipeline: List[dict], page_size: int, page: int):
+    image_lookup = {
+        '$lookup': {
+            'from': 'image',
+            'localField': 'event_id',
+            'foreignField': 'event_id',
+            'as': 'image'
+        },
+    }
     stage = {
         '$facet': {
             'metadata': [{'$count': 'total'}, {'$addFields': {'page': page}}],
-            'data': [{'$skip': page * page_size}, {'$limit': page_size}]
+            'data': [
+                {'$skip': page * page_size},
+                {'$limit': page_size},
+                image_lookup
+            ]
         }
     }
     return pipeline + [stage]
@@ -702,7 +727,7 @@ STAGES = {
     'match': Match,
     'shuffle': Shuffle,
     'select': Select,
-    'match_tags': MatchTags,
+    'select_group': SelectGroup,
     'map_labels': MapLabels,
     'select_labels': SelectLabels,
     'filter_labels': FilterLabels,
@@ -724,8 +749,8 @@ class StagesEnum(str, Enum):
     pass
 
 
-for stage in STAGES.keys():
-    extend_enum(StagesEnum, stage, stage)
+for _stage in STAGES.keys():
+    extend_enum(StagesEnum, _stage, _stage)
 
 
 class QueryStage(EmbeddedModel):

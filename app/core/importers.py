@@ -5,7 +5,7 @@ from app.models import ImageAnnotations, Tag, Polygon, Detection,\
     Polyline, Keypoints, ObjectId, Caption
 
 
-class DatasetImportFormat(Enum):
+class DatasetImportFormat(str, Enum):
     CAMVID = 'camvid'
     COCO = 'coco'
     CVAT_XML = 'cvat'

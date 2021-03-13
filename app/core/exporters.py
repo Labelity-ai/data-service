@@ -1,11 +1,11 @@
 from typing import List
 from enum import Enum
-from datumaro.components.dataset import Dataset, AnnotationType
+from datumaro.components.dataset import Dataset
 from datumaro.components.extractor import Bbox, Polygon, Label, PolyLine, Points, DatasetItem
 from app.models import ImageAnnotations
 
 
-class DatasetExportFormat(Enum):
+class DatasetExportFormat(str, Enum):
     CAMVID = 'camvid'
     PASCAL_VOC = 'voc'
     OBJECT_DETECTION_TFRECORD = 'tf_detection_api'
