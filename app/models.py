@@ -4,8 +4,9 @@ import enum
 from collections import defaultdict
 from datetime import datetime
 
-from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine, Reference
+from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import DESCENDING
 from pydantic import validator, BaseModel
 
 from app.utils import json_loads, json_dumps
@@ -26,6 +27,7 @@ class ModelConfig:
 
 class Prediction(EmbeddedModel):
     label: str
+    group: str = 'ground_truth'
     score: Optional[float] = None
     attributes: Dict[str, Any] = {}
 
@@ -62,6 +64,7 @@ class Polyline(Prediction):
 
 class Caption(EmbeddedModel):
     caption: str
+    group: str = 'ground_truth'
     attributes: Dict[str, Any] = {}
 
     Config = ModelConfig
@@ -100,7 +103,7 @@ class ImageAnnotations(Model):
     @staticmethod
     def _extract_labels(objects: List[Prediction], shape: Shape, labels: set, attributes):
         for obj in objects:
-            key = (obj.label, shape)
+            key = (obj.label, shape, obj.group)
             attributes[key].update(obj.attributes.keys())
             labels.add(key)
 
@@ -117,8 +120,8 @@ class ImageAnnotations(Model):
         return [Label(name=name,
                       shape=shape,
                       project_id=self.project_id,
-                      attributes=list(attributes[(name, shape)]))
-                for name, shape in labels]
+                      attributes=list(attributes[(name, shape, group)]))
+                for name, shape, group in labels]
 
     Config = ModelConfig
 
@@ -160,7 +163,12 @@ class Project(Model):
 
 
 class Image(Model):
+    project_id: ObjectId
     event_id: str
+    width: int
+    height: int
+
+    created_time: datetime
 
     Config = ModelConfig
 
@@ -194,5 +202,16 @@ engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
 async def initialize():
     await engine.get_collection(Project).create_index('user_id')
     await engine.get_collection(Dataset).create_index('project_id')
-    await engine.get_collection(ImageAnnotations).create_index('project_id')
-    await engine.get_collection(ImageAnnotations).create_index('event_id', unique=True)
+    await engine.get_collection(ImageAnnotations).create_index([
+        ('project_id', DESCENDING),
+        ('has_image', DESCENDING),
+        ('event_id', DESCENDING),
+    ])
+    await engine.get_collection(ImageAnnotations).create_index('attributes.$**')
+    await engine.get_collection(ImageAnnotations).create_index('labels.$**')
+    await engine.get_collection(Image).create_index([
+        ('project_id', DESCENDING),
+        ('event_id', DESCENDING)
+    ], unique=True)
+    await engine.get_collection(Image).create_index('created_time')
+    await engine.get_collection(FastToken).create_index('dataset_id')
