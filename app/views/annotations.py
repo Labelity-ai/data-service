@@ -5,7 +5,6 @@ from fastapi_utils.api_model import APIMessage
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, File, UploadFile
-from odmantic import ObjectId
 
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult
 from app.models import ImageAnnotations, Project
@@ -58,20 +57,20 @@ class AnnotationsView:
     @router.post("/annotations_bulk")
     async def add_annotations_bulk(self, annotations: List[ImageAnnotationsPostSchema],
                                    group: str = 'ground_truth',
-                                   replace: bool = True) -> List[ImageAnnotations]:
+                                   replace: bool = True):
         if len(annotations) > Config.POST_BULK_LIMIT:
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                                 f'Payload too large. The maximum number of annotations to be'
                                 f' added in a single request is {Config.POST_BULK_LIMIT}')
 
-        return await AnnotationsService.add_annotations_bulk(annotations, replace, group, self.project.id)
+        await AnnotationsService.add_annotations_bulk(annotations, replace, group, self.project.id)
 
     @router.post("/annotations_file")
     async def add_annotations_file(self,
                                    annotations_format: DatasetImportFormat,
                                    replace: bool,
                                    file: UploadFile = File(...),
-                                   group: str = 'group_truth') -> List[ImageAnnotations]:
+                                   group: str = 'group_truth'):
         if file.content_type not in ['application/xml', 'application/json', 'text/xml']:
             raise HTTPException(status.HTTP_400_BAD_REQUEST,
                                 'File should be one of the supported mime types (xml or json)')
@@ -83,7 +82,7 @@ class AnnotationsView:
                 temp_file.write(file_content)
                 temp_file.flush()
                 print(temp_file.name)
-                return await AnnotationsService.add_annotations_file(
+                await AnnotationsService.add_annotations_file(
                     temp_file.name, annotations_format, replace, group, self.project.id)
 
     @router.delete("/annotations/{event_id}")

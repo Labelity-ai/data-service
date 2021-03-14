@@ -84,6 +84,8 @@ def import_dataset(input_file: str, format: DatasetImportFormat, project_id: Obj
                     Keypoints(label=label.name, attributes=annotation.attributes, points=points)
                 )
 
+        print(captions)
+
         image_annotations = ImageAnnotations(
             attributes=item.attributes,
             event_id=event_id,
