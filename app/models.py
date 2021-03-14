@@ -168,7 +168,7 @@ class Image(Model):
     width: int
     height: int
 
-    created_time: datetime
+    #created_time: datetime
 
     Config = ModelConfig
 
@@ -187,7 +187,7 @@ class QueryExpression(BaseModel):
     field: Optional[str]
     literal: Union[int, float, str, None]
     operator: Optional[str]
-    parameters: Dict[str, Union[float, QueryExpression, str]] = {}
+    parameters: Dict[str, Union[float, 'QueryExpression', str]] = {}
     # created_at: datetime = Field(default_factory=datetime.utcnow)
 
     Config = ModelConfig

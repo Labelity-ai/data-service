@@ -8,7 +8,7 @@ from pymongo import ASCENDING, DESCENDING
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult, PredictionPostData, CaptionPostData
 from app.models import ImageAnnotations, Project, engine, Image, Prediction, Caption
 from app.core.importers import DatasetImportFormat, import_dataset
-from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline, QueryPipeline
+from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline
 from app.services.projects import ProjectService
 from app.services.storage import StorageService
 
@@ -47,42 +47,10 @@ class AnnotationsService:
         return annotations
 
     @staticmethod
-    async def get_annotations(page_size: int,
-                              page: int,
-                              only_with_images: bool,
-                              sort_field: AnnotationSortField,
-                              sort_direction: AnnotationSortDirection,
-                              project: Project) -> AnnotationsQueryResult:
-        pipeline = [{'$match': {'project_id': project.id}}]
-
-        if only_with_images:
-            pipeline[0]['$match']['has_image'] = True
-
-        sort_dir = DESCENDING if sort_direction == AnnotationSortDirection.DESCENDING else ASCENDING
-        pipeline += [{'$sort': {sort_field.value: sort_dir}}]
-
-        pipeline = make_paginated_pipeline(pipeline, page_size, page)
-        collection = engine.get_collection(ImageAnnotations)
-        result, *_ = await collection.aggregate(pipeline).to_list(length=None)
-        return AnnotationsQueryResult(data=result['data'], pagination=result['metadata'][0])
-
-    @staticmethod
-    async def run_annotations_pipeline(query: List[QueryStage],
-                                       page_size: int, page: int,
-                                       project: Project) -> AnnotationsQueryResult:
-        pipeline = [{'$match': {'project_id': project.id}}]
-
-        project_labels = await ProjectService.get_project_labels(project.id)
-        project_attributes = await ProjectService.get_project_attributes(project.id)
-
-        for step in query:
-            try:
-                stage = STAGES[step.stage.value](**step.parameters)
-                stage.validate_stage(project_labels=project_labels, project_attributes=project_attributes)
-                pipeline.extend(stage.to_mongo())
-            except ValueError as error:
-                print(error)
-                raise HTTPException(400, detail=str(error))
+    async def _run_annotations_pipeline(pipeline: List[dict],
+                                        page_size: int, page: int,
+                                        project: Project) -> AnnotationsQueryResult:
+        pipeline = [{'$match': {'project_id': project.id}}] + pipeline
 
         pipeline = make_paginated_pipeline(pipeline, page_size, page)
         collection = engine.get_collection(ImageAnnotations)
@@ -99,14 +67,49 @@ class AnnotationsService:
                 item['image_width'] = image['width']
                 item['image_height'] = image['height']
 
-        pipeline_obj = QueryPipeline(steps=query, project_id=project.id)
-        pipeline_obj = await engine.save(pipeline_obj)
-
         pagination = result['metadata'][0] if result['metadata'] else {'page': 0, 'total': 0}
         data = result['data']
 
-        return AnnotationsQueryResult(
-            data=data, pagination=pagination, pipeline_id=pipeline_obj.id)
+        return AnnotationsQueryResult(data=data, pagination=pagination)
+
+    @staticmethod
+    async def get_annotations(page_size: int,
+                              page: int,
+                              only_with_images: bool,
+                              sort_field: AnnotationSortField,
+                              sort_direction: AnnotationSortDirection,
+                              project: Project) -> AnnotationsQueryResult:
+        pipeline = []
+
+        if only_with_images:
+            pipeline += [{'$match': {'has_image': True}}]
+
+        sort_dir = DESCENDING if sort_direction == AnnotationSortDirection.DESCENDING else ASCENDING
+        pipeline += [{'$sort': {sort_field.value: sort_dir}}]
+
+        return await AnnotationsService._run_annotations_pipeline(
+            pipeline, page_size=page_size, page=page, project=project)
+
+    @staticmethod
+    async def run_annotations_pipeline(query: List[QueryStage],
+                                       page_size: int, page: int,
+                                       project: Project) -> AnnotationsQueryResult:
+        pipeline = []
+
+        project_labels = await ProjectService.get_project_labels(project.id)
+        project_attributes = await ProjectService.get_project_attributes(project.id)
+
+        for step in query:
+            try:
+                stage = STAGES[step.stage.value](**step.parameters)
+                stage.validate_stage(project_labels=project_labels, project_attributes=project_attributes)
+                pipeline.extend(stage.to_mongo())
+            except ValueError as error:
+                print(error)
+                raise HTTPException(400, detail=str(error))
+
+        return await AnnotationsService._run_annotations_pipeline(
+            pipeline, page_size=page_size, page=page, project=project)
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema,
@@ -118,8 +121,12 @@ class AnnotationsService:
     async def add_annotations_bulk(annotations: List[ImageAnnotationsPostSchema],
                                    replace: bool, group: str, project_id: ObjectId) -> List[ImageAnnotations]:
         event_ids = [annotation.event_id for annotation in annotations]
+
         previous_instances = await engine.find(
-            ImageAnnotations, ImageAnnotations.event_id.in_(event_ids))
+            ImageAnnotations,
+            ImageAnnotations.project_id == project_id,
+            ImageAnnotations.event_id.in_(event_ids))
+
         event_id_to_instance = {ins.event_id: ins for ins in previous_instances}
 
         images = await engine.find(Image, Image.event_id.in_(event_ids))
