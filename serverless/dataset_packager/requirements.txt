@@ -1,0 +1,4 @@
+boto3==1.17.12
+datumaro
+cloudpickle
+s3fs==0.4.2

@@ -13,7 +13,8 @@ custom:
   serviceName: image-optimization
   stage: ${opt:stage, self:custom.defaultStage}
   defaultStage: dev
-  bucket: labelity-use-${self:custom.stage}-images
+  imagesBucket: labelity-use-${self:custom.stage}-images
+  envFile: ${file(env.${opt:stage, self:provider.stage}.json)}
   pythonRequirements:
     dockerizePip: true
     useStaticCache: false
@@ -43,21 +44,21 @@ provider:
     - Effect: "Allow"
       Action:
         - "s3:ListBucket"
-      Resource: arn:aws:s3:::${self:custom.bucket}/*
+      Resource: arn:aws:s3:::${self:custom.imagesBucket}/*
     - Effect: "Allow"
       Action:
         - "s3:GetObject"
-      Resource: arn:aws:s3:::${self:custom.bucket}/raw/*
+      Resource: arn:aws:s3:::${self:custom.imagesBucket}/raw/*
     - Effect: "Allow"
       Action:
         - "s3:PutObject"
         - "s3:GetObject"
-      Resource: arn:aws:s3:::${self:custom.bucket}/thumbnails/*
+      Resource: arn:aws:s3:::${self:custom.imagesBucket}/thumbnails/*
     - Effect: "Allow"
       Action:
         - "s3:DeleteObject"
         - "s3:GetObject"
-      Resource: arn:aws:s3:::${self:custom.bucket}/videos/*
+      Resource: arn:aws:s3:::${self:custom.imagesBucket}/videos/*
 
 package:
   individually: true
@@ -69,27 +70,40 @@ functions:
     memorySize: 256
     lambdaInsights: true
     package: { }
-    environment: ${file(env.${opt:stage, self:provider.stage}.json)}
+    environment: ${self:custom.envFile}
     events:
       - s3:
-          bucket: ${self:custom.bucket}
-          event: s3:ObjectRemoved:*
-          rules:
-            - prefix: raw/
-      - s3:
-          bucket: ${self:custom.bucket}
+          bucket: ${self:custom.imagesBucket}
           event: s3:ObjectCreated:*
+          existing: true
           rules:
             - prefix: raw/
+
+  update_images:
+    handler: handler.main
+    module: image_processor
+    memorySize: 256
+    lambdaInsights: true
+    package: { }
+    environment: ${self:custom.envFile}
+    events:
+      - s3:
+          bucket: ${self:custom.imagesBucket}
+          event: s3:ObjectRemoved:*
+          existing: true
+          rules:
+            - prefix: raw/
+
   video_to_frames:
     handler: handler.main
     module: video_processor
     lambdaInsights: true
     memorySize: 512
-    environment: ${file(env.${opt:stage, self:provider.stage}.json)}
+    environment: ${self:custom.envFile}
     events:
       - s3:
-          bucket: ${self:custom.bucket}
+          bucket: ${self:custom.imagesBucket}
           event: s3:ObjectCreated:*
+          existing: true
           rules:
             - prefix: videos/
