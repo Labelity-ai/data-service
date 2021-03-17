@@ -1,8 +1,9 @@
 from typing import List
 from enum import Enum
 from datumaro.components.dataset import Dataset
-from datumaro.components.extractor import Bbox, Polygon, Label, PolyLine, Points, DatasetItem
-from app.models import ImageAnnotations
+from datumaro.components.extractor import Bbox, Polygon, Label, PolyLine, Points, DatasetItem, Caption
+from datumaro.util.image import Image
+from app.schema import ImageAnnotationsData
 
 
 class DatasetExportFormat(str, Enum):
@@ -21,11 +22,17 @@ class DatasetExportFormat(str, Enum):
     CVAT_XML = 'cvat'
 
 
-def create_datumaro_dataset(annotations: List[ImageAnnotations]):
+def create_datumaro_dataset(annotations: List[ImageAnnotationsData]):
     items = []
+    labels = list(set(
+        label.name
+        for image_annotations in annotations
+        for label in image_annotations.get_labels()
+    ))
+    labels_index = {v: i for i, v in enumerate(labels)}
 
     for image_annotations in annotations:
-        boxes = [Bbox(label=det.label,
+        boxes = [Bbox(label=labels_index[det.label],
                       attributes=det.attributes,
                       x=det.box[0],
                       y=det.box[1],
@@ -36,26 +43,32 @@ def create_datumaro_dataset(annotations: List[ImageAnnotations]):
         tags = [Label(label=tag.label, attributes=tag.attributes)
                 for tag in image_annotations.tags]
 
-        points = [Points(label=points.label,
+        points = [Points(label=labels_index[points.label],
                          points=points.points,
                          attributes=points.attributes)
                   for points in image_annotations.points]
 
-        polygons = [Polygon(label=polygon.label,
+        polygons = [Polygon(label=labels_index[polygon.label],
                             points=polygon.points,
                             attributes=polygon.attributes)
                     for polygon in image_annotations.polygons]
 
-        polylines = [PolyLine(label=polyline.label,
+        polylines = [PolyLine(label=labels_index[polyline.label],
                               points=polyline.points,
                               attributes=polyline.attributes)
                      for polyline in image_annotations.polylines]
 
+        captions = [Caption(caption=caption) for caption in image_annotations.captions]
+
+        # image_path = image_annotations.event_id if image_annotations.has_image else None
+        image_path = image_annotations.event_id
+        image = image_path and Image(path=image_path,
+                                     size=(image_annotations.image_height, image_annotations.image_height))
         item = DatasetItem(id=image_annotations.event_id,
-                           annotations=boxes + polygons + polylines + points + tags)
+                           annotations=boxes + polygons + polylines + points + tags + captions,
+                           image=image)
         items.append(item)
 
-    categories = []  # TODO
-    dataset = Dataset.from_iterable(items, categories=categories)
+    dataset = Dataset.from_iterable(items, categories=labels)
 
     return dataset

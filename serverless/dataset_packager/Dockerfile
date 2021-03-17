@@ -1,4 +1,4 @@
-FROM python:3.8-buster
+FROM python:3.7-buster
 
 ARG FUNCTION_DIR="/function"
 
@@ -14,6 +14,9 @@ RUN apt-get update && \
   make \
   cmake \
   unzip \
+  ffmpeg \
+  libsm6 \
+  libxext6 \
   libcurl4-openssl-dev
 
 COPY handler.py ${FUNCTION_DIR}/handler.py
