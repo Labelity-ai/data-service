@@ -6,7 +6,8 @@ from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, Response
 from odmantic import ObjectId
 
-from app.schema import DatasetPostSchema, DatasetGetSortQuery, ImageAnnotationsPostSchema, DatasetToken
+from app.schema import DatasetPostSchema, DatasetGetSortQuery, \
+    ImageAnnotationsPostSchema, DatasetToken, ImageAnnotationsData
 from app.models import Dataset, ImageAnnotations, Label, Project, FastToken
 from app.security import get_project, get_dataset_token
 from app.config import Config
@@ -23,7 +24,7 @@ class DatasetsViewBase:
         return await DatasetService.get_dataset_by_id(id, project_id)
 
     @staticmethod
-    async def get_annotations_by_dataset_id(id: ObjectId, project_id: ObjectId) -> List[ImageAnnotations]:
+    async def get_annotations_by_dataset_id(id: ObjectId, project_id: ObjectId) -> List[ImageAnnotationsData]:
         return await DatasetService.get_annotations_by_dataset_id(id, project_id)
 
     @staticmethod
@@ -58,7 +59,8 @@ class DatasetsViewBase:
 
     @staticmethod
     async def get_dataset_labels(id: ObjectId, project_id: ObjectId) -> List[Label]:
-        return await DatasetService.get_dataset_labels(id, project_id)
+        dataset = await DatasetsViewBase.get_dataset_by_id(id, project_id)
+        return await DatasetService.get_dataset_labels(dataset)
 
     @staticmethod
     async def create_dataset_access_token(id: ObjectId, project_id: ObjectId) -> List[Label]:
@@ -68,7 +70,8 @@ class DatasetsViewBase:
     @staticmethod
     async def download_dataset(id: ObjectId, project_id: ObjectId,
                                format: DatasetExportFormat, response: Response) -> APIMessage:
-        export_status = await DatasetService.download_dataset(format, id, project_id)
+        dataset = await DatasetService.get_dataset_by_id(id, project_id)
+        export_status = await DatasetService.download_dataset(dataset, format)
 
         if export_status == DatasetExportingStatus.STARTED:
             response.status_code = status.HTTP_202_ACCEPTED
@@ -77,7 +80,7 @@ class DatasetsViewBase:
             response.status_code = status.HTTP_202_ACCEPTED
             return APIMessage(detail='Dataset exporting in progress')
         elif export_status == DatasetExportingStatus.FINISHED:
-            url = await DatasetService.get_dataset_download_url(format, id, project_id)
+            url = await DatasetService.get_dataset_download_url(dataset, format)
             return APIMessage(detail=url)
 
     @staticmethod
@@ -94,7 +97,7 @@ class DatasetsView:
         return await DatasetsViewBase.get_dataset_by_id(id, self.project.id)
 
     @router.get("/dataset/{id}/annotations")
-    async def get_annotations_by_dataset_id(self, id: ObjectId) -> List[ImageAnnotations]:
+    async def get_annotations_by_dataset_id(self, id: ObjectId) -> List[ImageAnnotationsData]:
         return await DatasetsViewBase.get_annotations_by_dataset_id(id, self.project.id)
 
     @router.post("/dataset/{id}/annotations")
@@ -132,21 +135,11 @@ class DatasetsView:
 
     @router.get("/dataset/{id}/download")
     async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> APIMessage:
-        export_status = await DatasetService.download_dataset(format, id, self.project.id)
+        return await DatasetsViewBase.download_dataset(id, self.project.id, format, response)
 
-        if export_status == DatasetExportingStatus.STARTED:
-            response.status_code = status.HTTP_202_ACCEPTED
-            return APIMessage(detail='Starting dataset exporting')
-        elif export_status == DatasetExportingStatus.QUEUED:
-            response.status_code = status.HTTP_202_ACCEPTED
-            return APIMessage(detail='Dataset exporting in progress')
-        elif export_status == DatasetExportingStatus.FINISHED:
-            url = await DatasetService.get_dataset_download_url(id, self.project.id)
-            return APIMessage(detail=url)
-
-    @router.get("/dataset/formats")
-    async def get_export_formats(self) -> List[str]:
-        return [x.value for x in DatasetExportFormat]
+    @router.get("/meta/dataset/formats")
+    def get_export_formats(self) -> List[str]:
+        return DatasetsViewBase.get_export_formats()
 
 
 @cbv(router)
@@ -159,7 +152,7 @@ class DatasetsSharedView:
             self.dataset_token.dataset_id, self.dataset_token.project_id)
 
     @router.get("/dataset_shared/annotations")
-    async def get_annotations_by_dataset_id(self) -> List[ImageAnnotations]:
+    async def get_annotations_by_dataset_id(self) -> List[ImageAnnotationsData]:
         return await DatasetsViewBase.get_annotations_by_dataset_id(
             self.dataset_token.dataset_id, self.dataset_token.project_id
         )
@@ -176,6 +169,6 @@ class DatasetsSharedView:
             self.dataset_token.dataset_id, self.dataset_token.project_id, format, response
         )
 
-    @router.get("/dataset_shared/formats")
+    @router.get("/meta/dataset_shared/formats")
     def get_export_formats(self) -> List[str]:
         return DatasetsViewBase.get_export_formats()

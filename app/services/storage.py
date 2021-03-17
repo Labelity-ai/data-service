@@ -63,7 +63,7 @@ class StorageService:
             'get_object',
             ExpiresIn=Config.SIGNED_GET_OBJECT_URL_EXPIRATION,
             Params={
-                'Bucket': Config.IMAGE_STORAGE_BUCKET,
-                'Key': key,
+                'Bucket': Config.DATASET_ARTIFACTS_BUCKET,
+                'Key': '/'.join(key.split('/')[1:]),
             },
         )
