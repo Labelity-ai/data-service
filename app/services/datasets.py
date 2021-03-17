@@ -7,9 +7,10 @@ from fastapi import HTTPException
 from odmantic import ObjectId
 import s3fs
 
-from app.schema import DatasetPostSchema, DatasetGetSortQuery, DatasetToken
+from app.schema import DatasetPostSchema, DatasetGetSortQuery, DatasetToken, ImageAnnotationsData
 from app.models import ImageAnnotations, Dataset, Label, engine, FastToken
 from app.services.storage import StorageService
+from app.services.annotations import AnnotationsService
 from app.core.aggregations import GET_LABELS_PIPELINE
 from app.core.exporters import create_datumaro_dataset, DatasetExportFormat
 from app.security import create_fast_jwt_token
@@ -24,16 +25,16 @@ class DatasetExportingStatus(Enum):
     FINISHED = 'finished'
 
 
-def _get_dataset_exporting_result_key(dataset_id: ObjectId, project_id: ObjectId):
+def _get_dataset_exporting_result_key(dataset: Dataset, format: DatasetExportFormat):
     return f'{Config.DATASET_ARTIFACTS_BUCKET}/' \
            f'{Config.DATASET_EXPORTING_RESULTS_FOLDER}/' \
-           f'{project_id}/{dataset_id}.zip'
+           f'{dataset.project_id}/{dataset.name}/{dataset.name}_{format.value}_v{dataset.version}.zip'
 
 
-def _get_dataset_exporting_request_key(format: str, dataset_id: ObjectId, project_id: ObjectId):
+def _get_dataset_exporting_request_key(dataset: Dataset, format: DatasetExportFormat):
     return f'{Config.DATASET_ARTIFACTS_BUCKET}/' \
            f'{Config.DATASET_EXPORTING_QUEUE_FOLDER}/' \
-           f'{project_id}/{dataset_id}__{format}.pkl'
+           f'{dataset.project_id}/{dataset.name}/{dataset.name}_{format.value}_v{dataset.version}.pkl'
 
 
 class DatasetService:
@@ -47,15 +48,14 @@ class DatasetService:
         return dataset
 
     @staticmethod
-    async def get_annotations_by_dataset_id(dataset_id: ObjectId, project_id: ObjectId) -> List[ImageAnnotations]:
-        dataset = await engine.find_one(
-            Dataset,
-            (Dataset.id == dataset_id) & (Dataset.project_id == project_id))
+    async def get_annotations_by_dataset_id(dataset_id: ObjectId, project_id: ObjectId) -> List[ImageAnnotationsData]:
+        dataset = await DatasetService.get_dataset_by_id(dataset_id, project_id)
 
-        if dataset is None:
-            raise HTTPException(404)
+        result = await AnnotationsService.run_raw_annotations_pipeline(
+            [{'$match': {'event_id': {'$in': dataset.event_ids}}}],
+            page=0, page_size=int(10e10), project_id=project_id)
 
-        return await engine.find(ImageAnnotations, ImageAnnotations.event_id.in_(dataset.event_ids))
+        return result.data
 
     @staticmethod
     async def delete_dataset(dataset_id: ObjectId, project_id: ObjectId):
@@ -117,33 +117,41 @@ class DatasetService:
         return await engine.find(Dataset, *queries, **kwargs)
 
     @staticmethod
-    async def get_dataset_labels(dataset_id: ObjectId, project_id: ObjectId) -> List[Label]:
-        labels_pipeline = [{'$match': {'project_id': project_id, 'dataset_id': dataset_id}}] + GET_LABELS_PIPELINE
+    async def get_dataset_labels(dataset: Dataset) -> List[Label]:
+        labels_pipeline = [{
+            '$match': {
+                'project_id': dataset.project_id,
+                'event_id': {'$in': dataset.event_ids}
+            }
+        }] + GET_LABELS_PIPELINE
         collection = engine.get_collection(ImageAnnotations)
         labels = await collection.aggregate(labels_pipeline).to_list(length=None)
         return [Label(name=doc['name'], attributes=doc['attributes'], shape=doc['shape']) for doc in labels]
 
     @staticmethod
-    async def get_dataset_download_url(format: DatasetExportFormat, dataset_id: ObjectId, project_id: ObjectId) -> str:
-        key = _get_dataset_exporting_request_key(format.value, dataset_id, project_id)
+    async def get_dataset_download_url(dataset: Dataset, format: DatasetExportFormat) -> str:
+        key = _get_dataset_exporting_result_key(dataset, format)
         return StorageService.create_presigned_get_url_for_object_download(key)
 
     @staticmethod
-    async def download_dataset(format: DatasetExportFormat,
-                               dataset_id: ObjectId, project_id: ObjectId) -> DatasetExportingStatus:
-        annotations = await DatasetService.get_annotations_by_dataset_id(dataset_id, project_id)
-        dataset = create_datumaro_dataset(annotations)
-        request_file_key = _get_dataset_exporting_request_key(format.value, dataset_id, project_id)
-        result_file_key = _get_dataset_exporting_result_key(dataset_id, project_id)
-
-        if s3_fs.exists(request_file_key):
-            return DatasetExportingStatus.QUEUED
+    async def download_dataset(dataset: Dataset, format: DatasetExportFormat) -> DatasetExportingStatus:
+        request_file_key = _get_dataset_exporting_request_key(dataset, format)
+        result_file_key = _get_dataset_exporting_result_key(dataset, format)
 
         if s3_fs.exists(result_file_key):
             return DatasetExportingStatus.FINISHED
 
-        with s3_fs.open(request_file_key) as file:
-            cloudpickle.dump(dataset, file)
+        if s3_fs.exists(request_file_key):
+            return DatasetExportingStatus.QUEUED
+
+        annotations = await DatasetService.get_annotations_by_dataset_id(dataset.id, dataset.project_id)
+        dataset = create_datumaro_dataset(annotations)
+
+        print(request_file_key)
+
+        with s3_fs.open(request_file_key, 'wb') as file:
+            data = {'dataset': dataset, 'format': format.value}
+            cloudpickle.dump(data, file)
 
         return DatasetExportingStatus.STARTED
 
