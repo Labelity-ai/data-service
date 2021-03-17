@@ -31,14 +31,16 @@ def create_dataset_zip(dataset: Dataset, format: str, images_bucket, project_id,
 
             image_filename = item.image.path.split('/')[-1]
             image_path = f'{tmpdir}/{image_filename}'
+            print(f'{images_bucket}/raw/{project_id}/{image_filename}', image_path)
             s3_fs.get(f'{images_bucket}/raw/{project_id}/{image_filename}', image_path)
             item.image = Image(path=image_path, size=item.image.size)
 
-        dataset.export(zip_name, format, save_images=True)
+        dataset_folder = f'/tmp/{zip_name}'
+        dataset.export(dataset_folder, format, save_images=True)
 
-        zip_filename = f'{dataset_id}.zip'
+        zip_filename = f'/tmp/{dataset_id}.zip'
         zip_file = ZipFile(zip_filename, 'w', ZIP_DEFLATED)
-        zip_dir(zip_name, zip_file)
+        zip_dir(dataset_folder, zip_file)
         zip_file.close()
 
         output_key = f's3://{output_bucket}/{output_folder}/{project_id}/{dataset_id}/{zip_name}.zip'
@@ -56,6 +58,8 @@ def main(event, context):
         key = unquote_plus(record['s3']['object']['key'])
         project_id, dataset_id, filename = key.split('/')[-3:]
         filename = os.path.splitext(filename)[0]
+
+        print(f's3://{bucket}/{key}')
 
         with s3_fs.open(f's3://{bucket}/{key}', 'rb') as file:
             data = cloudpickle.load(file)
