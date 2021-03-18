@@ -5,6 +5,7 @@ from urllib.parse import unquote_plus
 import boto3
 import s3fs
 import pymongo
+import bson
 from PIL import Image
 
 MONGO_CLIENT = pymongo.MongoClient(
@@ -50,7 +51,7 @@ def update_database(event_id: str, value: bool, project_id: str, width: int, hei
             'event_id': event_id,
             'width': width,
             'height': height,
-            'project_id': project_id,
+            'project_id': bson.ObjectId(project_id.strip()),
         })
     else:
         MONGO_DB.image.delete_one({'event_id': event_id})

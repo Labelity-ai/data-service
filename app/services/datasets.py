@@ -113,7 +113,7 @@ class DatasetService:
         queries = [Dataset.project_id == project_id]
         if name:
             queries.append(Dataset.name == name)
-        kwargs = {'sort': sort.value} if sort else {}
+        kwargs = {'sort': getattr(Dataset, sort.value)} if sort else {}
         return await engine.find(Dataset, *queries, **kwargs)
 
     @staticmethod
@@ -131,23 +131,28 @@ class DatasetService:
     @staticmethod
     async def get_dataset_download_url(dataset: Dataset, format: DatasetExportFormat) -> str:
         key = _get_dataset_exporting_result_key(dataset, format)
-        return StorageService.create_presigned_get_url_for_object_download(key)
+        return await StorageService.create_presigned_get_url_for_object_download(key)
 
     @staticmethod
     async def download_dataset(dataset: Dataset, format: DatasetExportFormat) -> DatasetExportingStatus:
         request_file_key = _get_dataset_exporting_request_key(dataset, format)
         result_file_key = _get_dataset_exporting_result_key(dataset, format)
 
+        s3_fs.invalidate_cache()
+
         if s3_fs.exists(result_file_key):
-            return DatasetExportingStatus.FINISHED
+            try:
+                s3_fs.rm(request_file_key)
+            except:
+                pass
+            finally:
+                return DatasetExportingStatus.FINISHED
 
         if s3_fs.exists(request_file_key):
             return DatasetExportingStatus.QUEUED
 
         annotations = await DatasetService.get_annotations_by_dataset_id(dataset.id, dataset.project_id)
         dataset = create_datumaro_dataset(annotations)
-
-        print(request_file_key)
 
         with s3_fs.open(request_file_key, 'wb') as file:
             data = {'dataset': dataset, 'format': format.value}

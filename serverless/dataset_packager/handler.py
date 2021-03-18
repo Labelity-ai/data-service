@@ -78,8 +78,6 @@ def main(event, context):
                            output_bucket=bucket,
                            output_folder=output_folder)
 
-        s3_fs.rm(f's3://{bucket}/{key}')
-
 
 if __name__ == '__main__':
     # This will only run on local development
