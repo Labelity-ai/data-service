@@ -111,15 +111,14 @@ class ImageAnnotations(Model):
         labels = set()
         attributes = defaultdict(set)
 
-        self._extract_labels(self.points, Shape.POINT, labels, attributes)
-        self._extract_labels(self.detections, Shape.BOX, labels, attributes)
-        self._extract_labels(self.polygons, Shape.POLYGON, labels, attributes)
-        self._extract_labels(self.polylines, Shape.POLYLINE, labels, attributes)
-        self._extract_labels(self.tags, Shape.TAG, labels, attributes)
+        ImageAnnotations._extract_labels(self.points, Shape.POINT, labels, attributes)
+        ImageAnnotations._extract_labels(self.detections, Shape.BOX, labels, attributes)
+        ImageAnnotations._extract_labels(self.polygons, Shape.POLYGON, labels, attributes)
+        ImageAnnotations._extract_labels(self.polylines, Shape.POLYLINE, labels, attributes)
+        ImageAnnotations._extract_labels(self.tags, Shape.TAG, labels, attributes)
 
         return [Label(name=name,
                       shape=shape,
-                      project_id=self.project_id,
                       attributes=list(attributes[(name, shape, group)]))
                 for name, shape, group in labels]
 
@@ -128,6 +127,7 @@ class ImageAnnotations(Model):
 
 class Dataset(Model):
     name: str
+    version: int = 1
     description: str
     event_ids: List[str] = []
     project_id: ObjectId
@@ -201,7 +201,11 @@ engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
 
 async def initialize():
     await engine.get_collection(Project).create_index('user_id')
-    await engine.get_collection(Dataset).create_index('project_id')
+    await engine.get_collection(Dataset).create_index([
+        ('project_id', DESCENDING),
+        ('name', DESCENDING),
+        ('version', DESCENDING)
+    ])
     await engine.get_collection(ImageAnnotations).create_index([
         ('project_id', DESCENDING),
         ('has_image', DESCENDING),

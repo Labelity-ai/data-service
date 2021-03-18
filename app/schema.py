@@ -6,7 +6,7 @@ from fastapi_utils.camelcase import snake2camel
 
 from app.utils import json_dumps, json_loads
 from app.models import EmbeddedModel, ModelConfig, ObjectId, Label, check_relative_points,\
-    Tag, Detection, Keypoints, Polygon, Polyline, Caption
+    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations
 
 
 class SchemaBase(BaseModel):
@@ -56,9 +56,7 @@ class CaptionPostData(SchemaBase):
     attributes: Dict[str, Any] = {}
 
 
-class ImageAnnotationsPostSchema(SchemaBase):
-    event_id: str
-
+class ImageAnnotationsPutSchema(SchemaBase):
     points: List[KeypointsPostData] = []
     polylines: List[PolylinePostData] = []
     detections: List[DetectionPostData] = []
@@ -68,8 +66,23 @@ class ImageAnnotationsPostSchema(SchemaBase):
     attributes: Dict[str, Any] = {}
 
 
+class ImageAnnotationsPostSchema(ImageAnnotationsPutSchema):
+    event_id: str
+
+
+class ImageAnnotationsPatchSchema(SchemaBase):
+    points: Optional[List[KeypointsPostData]] = None
+    polylines: Optional[List[PolylinePostData]] = None
+    detections: Optional[List[DetectionPostData]] = None
+    polygons: Optional[List[PolygonPostData]] = None
+    tags: Optional[List[TagPostData]] = None
+    captions: Optional[List[CaptionPostData]] = None
+    attributes: Optional[Dict[str, Any]] = None
+
+
 class ImageAnnotationsData(SchemaBase):
     event_id: str
+    has_image: bool = False
     thumbnail_url: str = None
     image_url: str = None
     image_width: int = None
@@ -83,6 +96,9 @@ class ImageAnnotationsData(SchemaBase):
     captions: List[Caption] = []
     attributes: Dict[str, Any] = {}
     labels: List[Label] = []
+
+    def get_labels(self):
+        return ImageAnnotations.get_labels(self)
 
 
 class ProjectPostSchema(SchemaBase):
@@ -121,3 +137,13 @@ class ApiKey(SchemaBase):
 
 class DatasetToken(SchemaBase):
     token: str
+
+
+class ImageData(SchemaBase):
+    event_id: str
+    thumbnail_url: str
+    original_url: str
+    width: int
+    height: int
+
+    #created_time: datetime
