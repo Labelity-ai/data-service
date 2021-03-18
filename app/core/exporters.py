@@ -1,4 +1,5 @@
 from typing import List
+from pathlib import Path
 from enum import Enum
 from datumaro.components.dataset import Dataset
 from datumaro.components.extractor import Bbox, Polygon, Label, PolyLine, Points, DatasetItem, Caption
@@ -60,11 +61,10 @@ def create_datumaro_dataset(annotations: List[ImageAnnotationsData]):
 
         captions = [Caption(caption=caption) for caption in image_annotations.captions]
 
-        # image_path = image_annotations.event_id if image_annotations.has_image else None
-        image_path = image_annotations.event_id
+        image_path = image_annotations.event_id if image_annotations.has_image else None
         image = image_path and Image(path=image_path,
                                      size=(image_annotations.image_height, image_annotations.image_height))
-        item = DatasetItem(id=image_annotations.event_id,
+        item = DatasetItem(id=Path(image_annotations.event_id).stem,
                            annotations=boxes + polygons + polylines + points + tags + captions,
                            image=image)
         items.append(item)
