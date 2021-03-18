@@ -87,7 +87,7 @@ class AnnotationsView:
 
     @router.delete("/annotations/{event_id}")
     async def delete_annotations(self, event_id: str, group: str = None) -> APIMessage:
-        instance = await AnnotationsView.get_annotations_by_event_id(event_id)
+        instance = await self.get_annotations_by_event_id(event_id)
         result = await AnnotationsService.delete_annotations(instance, group)
         if result:
             return result
@@ -98,14 +98,14 @@ class AnnotationsView:
     async def replace_annotations(self, event_id: str,
                                   body: ImageAnnotationsPutSchema,
                                   group: str = None) -> ImageAnnotations:
-        instance = await AnnotationsView.get_annotations_by_event_id(event_id)
+        instance = await self.get_annotations_by_event_id(event_id)
         return await AnnotationsService.update_annotations(instance, body, group)
 
     @router.patch("/annotations/{event_id}")
     async def update_annotations(self, event_id: str,
                                  body: ImageAnnotationsPatchSchema,
                                  group: str = None) -> ImageAnnotations:
-        instance = await AnnotationsView.get_annotations_by_event_id(event_id)
+        instance = await self.get_annotations_by_event_id(event_id)
         return await AnnotationsService.update_annotations(instance, body, group)
 
     @router.get("/annotations/meta/stages")
