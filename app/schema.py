@@ -57,13 +57,13 @@ class CaptionPostData(SchemaBase):
 
 
 class ImageAnnotationsPutSchema(SchemaBase):
-    points: List[KeypointsPostData] = []
-    polylines: List[PolylinePostData] = []
-    detections: List[DetectionPostData] = []
-    polygons: List[PolygonPostData] = []
-    tags: List[TagPostData] = []
-    captions: List[CaptionPostData] = []
-    attributes: Dict[str, Any] = {}
+    points: List[KeypointsPostData]
+    polylines: List[PolylinePostData]
+    detections: List[DetectionPostData]
+    polygons: List[PolygonPostData]
+    tags: List[TagPostData]
+    captions: List[CaptionPostData]
+    attributes: Dict[str, Any]
 
 
 class ImageAnnotationsPostSchema(ImageAnnotationsPutSchema):

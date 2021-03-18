@@ -121,16 +121,21 @@ class AnnotationsService:
 
     @staticmethod
     async def update_annotations(instance: ImageAnnotations,
-                                 annotation: Union[ImageAnnotationsPatchSchema, ImageAnnotationsPutSchema]
-                                 , group: str) -> ImageAnnotations:
+                                 annotation: Union[ImageAnnotationsPatchSchema, ImageAnnotationsPutSchema],
+                                 group: str) -> ImageAnnotations:
         for attribute in ['tags', 'points', 'polygons', 'polylines', 'captions', 'detections']:
             new_data = getattr(annotation, attribute)
 
             if new_data is not None:
-                new = _replace_annotations(
-                    getattr(instance, attribute), getattr(annotation, attribute), group)
+                if not group:
+                    new = getattr(annotation, attribute)
+                else:
+                    new = _replace_annotations(getattr(instance, attribute),
+                                               getattr(annotation, attribute),
+                                               group=group)
                 setattr(instance, attribute, new)
 
+        instance.labels = instance.get_labels()
         return await engine.save(instance)
 
     @staticmethod
