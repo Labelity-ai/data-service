@@ -131,8 +131,9 @@ class Dataset(Model):
     description: str
     event_ids: List[str] = []
     project_id: ObjectId
+    parent_id: Optional[ObjectId] = None
+    child_id: Optional[ObjectId] = None
     created_at: datetime
-    updated_at: datetime
 
     Config = ModelConfig
 

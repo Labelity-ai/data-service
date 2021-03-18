@@ -49,7 +49,7 @@ class AnnotationsService:
 
     @staticmethod
     async def run_raw_annotations_pipeline(pipeline: List[dict],
-                                           page_size: int, page: int,
+                                           page_size: Optional[int], page: Optional[int],
                                            project_id: ObjectId) -> AnnotationsQueryResult:
         pipeline = [{'$match': {'project_id': project_id}}] + pipeline
 

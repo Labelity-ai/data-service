@@ -112,6 +112,12 @@ class DatasetPostSchema(SchemaBase):
     event_ids: List[str]
 
 
+class DatasetPatchSchema(SchemaBase):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    event_ids: Optional[List[str]] = None
+
+
 class DatasetGetSortQuery(Enum):
     NAME = 'name'
     CREATED_AT = 'created_at'
@@ -120,8 +126,8 @@ class DatasetGetSortQuery(Enum):
 
 class AnnotationsQueryResult(EmbeddedModel):
     class Pagination(BaseModel):
-        page: int
-        total: int
+        page: Optional[int]
+        total: Optional[int]
 
     data: List[ImageAnnotationsData]
     pagination: Pagination

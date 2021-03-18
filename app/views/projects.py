@@ -46,7 +46,7 @@ class ProjectsView:
     async def update_project(self, id: ObjectId, project: ProjectPostSchema) -> Project:
         return await ProjectService.update_project(id, project, self.user.id)
 
-    @router.delete("/dataset/{id}")
+    @router.delete("/project/{id}")
     async def delete_project(self, id: ObjectId) -> APIMessage:
         await ProjectService.delete_project(id, self.user.id)
         return APIMessage(detail=f"Deleted project {id}")

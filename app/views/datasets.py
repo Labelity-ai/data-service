@@ -3,14 +3,13 @@ from typing import List
 from fastapi_utils.api_model import APIMessage
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
-from fastapi import Depends, HTTPException, status, Response
+from fastapi import Depends, status, Response
 from odmantic import ObjectId
 
 from app.schema import DatasetPostSchema, DatasetGetSortQuery, \
-    ImageAnnotationsPostSchema, DatasetToken, ImageAnnotationsData
-from app.models import Dataset, ImageAnnotations, Label, Project, FastToken
+    DatasetToken, ImageAnnotationsData, DatasetPatchSchema
+from app.models import Dataset, Label, Project, FastToken
 from app.security import get_project, get_dataset_token
-from app.config import Config
 from app.services.datasets import DatasetService, DatasetExportingStatus, DatasetExportFormat
 
 router = InferringRouter(
@@ -28,18 +27,6 @@ class DatasetsViewBase:
         return await DatasetService.get_annotations_by_dataset_id(id, project_id)
 
     @staticmethod
-    async def attach_annotations_to_dataset(id: ObjectId, project_id: ObjectId,
-                                            annotations_ids: List[ObjectId] = [],
-                                            annotations: List[ImageAnnotationsPostSchema] = []) -> List[ImageAnnotations]:
-        if len(annotations) > Config.POST_BULK_LIMIT:
-            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                                f'Payload too large. The maximum number of annotations to be'
-                                f' added in a single request is {Config.POST_BULK_LIMIT}')
-
-        return await DatasetService.attach_annotations_to_dataset(
-            id, annotations_ids, annotations, project_id)
-
-    @staticmethod
     async def get_datasets(project_id: ObjectId, name: str = None,
                            sort: DatasetGetSortQuery = None) -> List[Dataset]:
         return await DatasetService.get_datasets(project_id, name, sort)
@@ -49,8 +36,14 @@ class DatasetsViewBase:
         return await DatasetService.create_dataset(dataset, project_id)
 
     @staticmethod
-    async def replace_dataset(id: ObjectId, dataset: DatasetPostSchema, project_id: ObjectId) -> Dataset:
-        return await DatasetService.update_dataset(id, dataset, project_id)
+    async def replace_dataset(id: ObjectId, body: DatasetPostSchema, project_id: ObjectId) -> Dataset:
+        dataset = await DatasetsViewBase.get_dataset_by_id(id, project_id)
+        return await DatasetService.update_dataset(dataset, body)
+
+    @staticmethod
+    async def update_dataset(id: ObjectId, body: DatasetPatchSchema, project_id: ObjectId) -> Dataset:
+        dataset = await DatasetsViewBase.get_dataset_by_id(id, project_id)
+        return await DatasetService.update_dataset(dataset, body)
 
     @staticmethod
     async def delete_dataset(id: ObjectId, project_id: ObjectId):
@@ -100,17 +93,11 @@ class DatasetsView:
     async def get_annotations_by_dataset_id(self, id: ObjectId) -> List[ImageAnnotationsData]:
         return await DatasetsViewBase.get_annotations_by_dataset_id(id, self.project.id)
 
-    @router.post("/dataset/{id}/annotations")
-    async def attach_annotations_to_dataset(self, id: ObjectId,
-                                            annotations_ids: List[ObjectId] = [],
-                                            annotations: List[ImageAnnotationsPostSchema] = []) -> List[ImageAnnotations]:
-        return await DatasetsViewBase.attach_annotations_to_dataset(
-            id, self.project.id, annotations_ids, annotations)
-
     @router.get("/dataset")
-    async def get_datasets(self, name: str = None,
+    async def get_datasets(self, name: str = None, include_all_revisions: bool = False,
                            sort: DatasetGetSortQuery = None) -> List[Dataset]:
-        return await DatasetService.get_datasets(self.project.id, name, sort)
+        return await DatasetService.get_datasets(
+            self.project.id, name, include_all_revisions, sort)
 
     @router.post("/dataset")
     async def create_dataset(self, dataset: DatasetPostSchema) -> Dataset:
@@ -119,6 +106,10 @@ class DatasetsView:
     @router.put("/dataset/{id}")
     async def replace_dataset(self, id: ObjectId, dataset: DatasetPostSchema) -> Dataset:
         return await DatasetsViewBase.replace_dataset(id, dataset, self.project.id)
+
+    @router.patch("/dataset/{id}")
+    async def update_dataset(self, id: ObjectId, dataset: DatasetPatchSchema) -> Dataset:
+        return await DatasetsViewBase.update_dataset(id, dataset, self.project.id)
 
     @router.delete("/dataset/{id}")
     async def delete_dataset(self, id: ObjectId):
@@ -136,6 +127,11 @@ class DatasetsView:
     @router.get("/dataset/{id}/download")
     async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> APIMessage:
         return await DatasetsViewBase.download_dataset(id, self.project.id, format, response)
+
+    @router.get("/dataset/{id}/revisions")
+    async def download_dataset(self, id: ObjectId) -> List[Dataset]:
+        dataset = await self.get_dataset_by_id(id)
+        return await DatasetService.get_dataset_revisions(dataset)
 
     @router.get("/meta/dataset/formats")
     def get_export_formats(self) -> List[str]:
