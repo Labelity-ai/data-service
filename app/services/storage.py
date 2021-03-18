@@ -94,8 +94,7 @@ class StorageService:
 
         if annotations:
             annotations.has_image = False
-
-        await engine.save(annotations)
+            await engine.save(annotations)
 
     @staticmethod
     async def get_images(event_id: str, page: int, page_size: int, project_id: ObjectId) -> List[ImageData]:

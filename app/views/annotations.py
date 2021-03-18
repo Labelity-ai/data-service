@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Union
 import tempfile
 
 from fastapi_utils.api_model import APIMessage
@@ -12,6 +12,7 @@ from app.models import ImageAnnotations, Project
 from app.security import get_project
 from app.config import Config
 from app.services.annotations import AnnotationsService, AnnotationSortDirection, AnnotationSortField
+from app.services.storage import StorageService
 from app.core.importers import DatasetImportFormat
 from app.core.query_engine.stages import QueryStage
 
@@ -86,13 +87,20 @@ class AnnotationsView:
         return await AnnotationsService.get_annotations_by_event_id(event_id, self.project.id)
 
     @router.delete("/annotations/{event_id}")
-    async def delete_annotations(self, event_id: str, group: str = None) -> APIMessage:
+    async def delete_annotations(self, event_id: str,
+                                 group: str = None,
+                                 delete_image: bool = False) -> Union[APIMessage, ImageAnnotations]:
+        if delete_image and group:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                'group and delete_image parameters are incompatible')
+
         instance = await self.get_annotations_by_event_id(event_id)
         result = await AnnotationsService.delete_annotations(instance, group)
-        if result:
-            return result
-        else:
-            return APIMessage(detail=f"Deleted annotations for {event_id}")
+
+        if delete_image:
+            await StorageService.delete_image(event_id, self.project.id)
+
+        return result if result else APIMessage(detail=f"Deleted annotations for {event_id}")
 
     @router.put("/annotations/{event_id}")
     async def replace_annotations(self, event_id: str,
