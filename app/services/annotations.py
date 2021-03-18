@@ -5,7 +5,8 @@ from fastapi import HTTPException
 from odmantic import ObjectId
 from pymongo import ASCENDING, DESCENDING
 
-from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult, PredictionPostData, CaptionPostData
+from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult,\
+    PredictionPostData, CaptionPostData, ImageAnnotationsPatchSchema, ImageAnnotationsPutSchema
 from app.models import ImageAnnotations, Project, engine, Image, Prediction, Caption
 from app.core.importers import DatasetImportFormat, import_dataset
 from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline
@@ -47,10 +48,10 @@ class AnnotationsService:
         return annotations
 
     @staticmethod
-    async def _run_annotations_pipeline(pipeline: List[dict],
-                                        page_size: int, page: int,
-                                        project: Project) -> AnnotationsQueryResult:
-        pipeline = [{'$match': {'project_id': project.id}}] + pipeline
+    async def run_raw_annotations_pipeline(pipeline: List[dict],
+                                           page_size: int, page: int,
+                                           project_id: ObjectId) -> AnnotationsQueryResult:
+        pipeline = [{'$match': {'project_id': project_id}}] + pipeline
 
         pipeline = make_paginated_pipeline(pipeline, page_size, page)
         collection = engine.get_collection(ImageAnnotations)
@@ -60,12 +61,13 @@ class AnnotationsService:
             image = item['image'] and item['image'][0]
 
             if image:
-                item['thumbnail_url'] = StorageService.create_presigned_get_url_for_thumbnail(
-                    item['event_id'], project.id)
-                item['image_url'] = StorageService.create_presigned_get_url_for_image(
-                    item['event_id'], project.id)
+                item['thumbnail_url'] = await StorageService.create_presigned_get_url_for_thumbnail(
+                    item['event_id'], project_id)
+                item['image_url'] = await StorageService.create_presigned_get_url_for_image(
+                    item['event_id'], project_id)
                 item['image_width'] = image['width']
                 item['image_height'] = image['height']
+                item['has_image'] = True
 
         pagination = result['metadata'][0] if result['metadata'] else {'page': 0, 'total': 0}
         data = result['data']
@@ -87,8 +89,8 @@ class AnnotationsService:
         sort_dir = DESCENDING if sort_direction == AnnotationSortDirection.DESCENDING else ASCENDING
         pipeline += [{'$sort': {sort_field.value: sort_dir}}]
 
-        return await AnnotationsService._run_annotations_pipeline(
-            pipeline, page_size=page_size, page=page, project=project)
+        return await AnnotationsService.run_raw_annotations_pipeline(
+            pipeline, page_size=page_size, page=page, project_id=project.id)
 
     @staticmethod
     async def run_annotations_pipeline(query: List[QueryStage],
@@ -108,14 +110,28 @@ class AnnotationsService:
                 print(error)
                 raise HTTPException(400, detail=str(error))
 
-        return await AnnotationsService._run_annotations_pipeline(
-            pipeline, page_size=page_size, page=page, project=project)
+        return await AnnotationsService.run_raw_annotations_pipeline(
+            pipeline, page_size=page_size, page=page, project_id=project.id)
 
     @staticmethod
     async def add_annotations(annotation: ImageAnnotationsPostSchema,
                               replace: bool, group: str, project_id: ObjectId) -> ImageAnnotations:
         result = await AnnotationsService.add_annotations_bulk([annotation], replace, group, project_id)
         return result[0]
+
+    @staticmethod
+    async def update_annotations(instance: ImageAnnotations,
+                                 annotation: Union[ImageAnnotationsPatchSchema, ImageAnnotationsPutSchema]
+                                 , group: str) -> ImageAnnotations:
+        for attribute in ['tags', 'points', 'polygons', 'polylines', 'captions', 'detections']:
+            new_data = getattr(annotation, attribute)
+
+            if new_data is not None:
+                new = _replace_annotations(
+                    getattr(instance, attribute), getattr(annotation, attribute), group)
+                setattr(instance, attribute, new)
+
+        return await engine.save(instance)
 
     @staticmethod
     async def add_annotations_bulk(annotations: List[ImageAnnotationsPostSchema],
@@ -148,7 +164,7 @@ class AnnotationsService:
                 instance.polylines = _replace_annotations(instance.polylines, annotation.polylines, group)
                 instance.captions = _replace_annotations(instance.captions, annotation.captions, group)
             else:
-                instance.detections = _add_group_to_annotations(annotation.detections, group)
+                instance.detections += _add_group_to_annotations(annotation.detections, group)
                 instance.polygons += _add_group_to_annotations(annotation.polygons, group)
                 instance.points += _add_group_to_annotations(annotation.points, group)
                 instance.tags += _add_group_to_annotations(annotation.tags, group)
@@ -162,19 +178,13 @@ class AnnotationsService:
         return await engine.save_all(result)
 
     @staticmethod
-    async def delete_annotations(event_id: str, group: Optional[str], project_id: ObjectId):
-        annotations = await AnnotationsService.get_annotations_by_event_id(event_id, project_id)
-
+    async def delete_annotations(annotations: ImageAnnotations, group: Optional[str]):
         if not group:
             await engine.delete(annotations)
         else:
-            annotations.tags = _replace_annotations(annotations.tags, [], group)
-            annotations.detections = _replace_annotations(annotations.detections, [], group)
-            annotations.polygons = _replace_annotations(annotations.polygons, [], group)
-            annotations.polylines = _replace_annotations(annotations.polylines, [], group)
-            annotations.points = _replace_annotations(annotations.points, [], group)
-            annotations.captions = _replace_annotations(annotations.captions, [], group)
-            await engine.save(annotations)
+            new_annotations = ImageAnnotationsPatchSchema(
+                tags=[], captions=[], detections=[], polygons=[], polylines=[], points=[])
+            return await AnnotationsService.update_annotations(annotations, new_annotations, group)
 
     @staticmethod
     async def add_annotations_file(file: str,

@@ -6,14 +6,14 @@ from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, File, UploadFile
 
-from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult
+from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult, \
+    ImageAnnotationsPutSchema, ImageAnnotationsPatchSchema
 from app.models import ImageAnnotations, Project
 from app.security import get_project
 from app.config import Config
 from app.services.annotations import AnnotationsService, AnnotationSortDirection, AnnotationSortField
 from app.core.importers import DatasetImportFormat
 from app.core.query_engine.stages import QueryStage
-
 
 router = InferringRouter(
     tags=["annotations"],
@@ -23,10 +23,6 @@ router = InferringRouter(
 @cbv(router)
 class AnnotationsView:
     project: Project = Depends(get_project)
-
-    @router.get("/annotations/{event_id}")
-    async def get_annotations_by_id(self, event_id: str) -> ImageAnnotations:
-        return await AnnotationsService.get_annotations_by_event_id(event_id, self.project.id)
 
     @router.get("/annotations/")
     async def get_annotations(self, page: int = 0,
@@ -85,10 +81,32 @@ class AnnotationsView:
                 await AnnotationsService.add_annotations_file(
                     temp_file.name, annotations_format, replace, group, self.project.id)
 
+    @router.get("/annotations/{event_id}")
+    async def get_annotations_by_event_id(self, event_id: str) -> ImageAnnotations:
+        return await AnnotationsService.get_annotations_by_event_id(event_id, self.project.id)
+
     @router.delete("/annotations/{event_id}")
     async def delete_annotations(self, event_id: str, group: str = None) -> APIMessage:
-        await AnnotationsService.delete_annotations(event_id, group, self.project.id)
-        return APIMessage(detail=f"Deleted annotations for {event_id}")
+        instance = await AnnotationsView.get_annotations_by_event_id(event_id)
+        result = await AnnotationsService.delete_annotations(instance, group)
+        if result:
+            return result
+        else:
+            return APIMessage(detail=f"Deleted annotations for {event_id}")
+
+    @router.put("/annotations/{event_id}")
+    async def replace_annotations(self, event_id: str,
+                                  body: ImageAnnotationsPutSchema,
+                                  group: str = None) -> ImageAnnotations:
+        instance = await AnnotationsView.get_annotations_by_event_id(event_id)
+        return await AnnotationsService.update_annotations(instance, body, group)
+
+    @router.patch("/annotations/{event_id}")
+    async def update_annotations(self, event_id: str,
+                                 body: ImageAnnotationsPatchSchema,
+                                 group: str = None) -> ImageAnnotations:
+        instance = await AnnotationsView.get_annotations_by_event_id(event_id)
+        return await AnnotationsService.update_annotations(instance, body, group)
 
     @router.get("/annotations/meta/stages")
     async def get_annotations_stages(self) -> Dict[str, dict]:
