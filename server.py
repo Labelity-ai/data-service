@@ -12,6 +12,7 @@ app = FastAPI(title='Labelity.ai API Service', default_response_class=ORJSONResp
 origins = [
     'http://localhost',
     'http://localhost:3000',
+    'http://localhost:3030',
 ]
 
 app.add_middleware(

@@ -53,8 +53,6 @@ def update_database(event_id: str, value: bool, project_id: str, width: int, hei
             'height': height,
             'project_id': bson.ObjectId(project_id.strip()),
         })
-    else:
-        MONGO_DB.image.delete_one({'event_id': event_id})
 
 
 def main(event, context):
