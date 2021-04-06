@@ -15,12 +15,28 @@ class StorageService:
         filename = image_name if image_name.endswith(f'.{extension}') else f'{image_name}.{extension}'
 
         async with aioboto3.client("s3") as s3_client:
-            return await s3_client.generate_presigned_post(
-                Config.IMAGE_STORAGE_BUCKET,
-                f'{Config.RAW_IMAGES_FOLDER}/{project_id}/{filename}',
-                Conditions=[{'Content-Type': content_type}],
+            url = await s3_client.generate_presigned_url(
+                'put_object',
+                Params={
+                    'Bucket': Config.IMAGE_STORAGE_BUCKET,
+                    'Key': f'{Config.RAW_IMAGES_FOLDER}/{project_id}/{filename}',
+                    'ContentType': content_type,
+                    # TODO: Add max file size
+                },
                 ExpiresIn=Config.SIGNED_POST_URL_EXPIRATION
             )
+            return {'url': url, 'method': 'PUT', 'fields': [], 'headers': {'Content-Type': content_type}}
+
+    @staticmethod
+    async def create_presigned_multipart_upload_url_for_dataset(filename: str, project_id: ObjectId) -> dict:
+        async with aioboto3.client("s3") as s3_client:
+            response = await s3_client.create_multipart_upload(
+                Bucket=Config.DATASET_ARTIFACTS_BUCKET,
+                Key=f'{Config.DATASET_IMPORT_FOLDER}/{project_id}/{filename}',
+                ContentType='application/zip',
+                # TODO: Add max file size
+            )
+            return response
 
     @staticmethod
     async def create_presigned_post_url_for_video(video_name: str, content_type: str,
@@ -31,12 +47,17 @@ class StorageService:
         filename = f'{video_name}__{start_sec}_{end_sec}_{fps}.{extension}'
 
         async with aioboto3.client("s3") as s3_client:
-            return await s3_client.generate_presigned_post(
-                Config.IMAGE_STORAGE_BUCKET,
-                f'{Config.VIDEOS_FOLDER}/{project_id}/{filename}',
-                Conditions=[{'Content-Type': content_type}],
+            url = await s3_client.generate_presigned_url(
+                'put_object',
+                Params={
+                    'Bucket': Config.IMAGE_STORAGE_BUCKET,
+                    'Key': f'{Config.VIDEOS_FOLDER}/{project_id}/{filename}',
+                    'ContentType': content_type,
+                    # TODO: Add max file size
+                },
                 ExpiresIn=Config.SIGNED_POST_URL_EXPIRATION
             )
+            return {'url': url, 'method': 'PUT', 'fields': [], 'headers': {'Content-Type': content_type}}
 
     @staticmethod
     async def create_presigned_get_url_for_thumbnail(event_id: str, project_id: ObjectId) -> str:
@@ -79,7 +100,8 @@ class StorageService:
         # TODO: Remove str wrapper
         image = await engine.find_one(Image, Image.project_id == str(project_id), Image.event_id == event_id)
         annotations = await engine.find_one(
-            ImageAnnotations, ImageAnnotations.project_id == project_id,
+            ImageAnnotations,
+            ImageAnnotations.project_id == project_id,
             ImageAnnotations.event_id == event_id)
 
         if not image:
