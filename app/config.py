@@ -26,3 +26,6 @@ class Config:
     VIDEO_FPS_LIMIT = int(os.environ.get('VIDEO_FPS_LIMIT', 5))
     JWT_ALGORITHM = "HS512"
     FAST_TOKEN_JWT_ALGORITHM = "HS256"
+    PREFECT_CODE_BUCKET = os.environ.get('PREFECT_CODE_BUCKET' 'labelity-use1-dev-prefect-code')
+    PREFECT_PROJECT_NAME = os.environ.get('PREFECT_PROJECT_NAME' 'development')
+    PREFECT_API_KEY = os.environ.get('PREFECT_PROJECT_NAME')
