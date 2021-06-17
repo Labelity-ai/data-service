@@ -194,6 +194,54 @@ class QueryExpression(BaseModel):
     Config = ModelConfig
 
 
+class NodeType(enum.Enum):
+    INPUT = 'input'
+    OUTPUT = 'output'
+    DATA_PROCESSING = 'data_processing'
+    DATA_AUGMENTATION = 'data_augmentation'
+    INFERENCE = 'inference'
+
+
+class RunStatus(enum.Enum):
+    SUCCESS = 'success'
+    IN_PROGRESS = 'in_progress'
+    FAILED = 'failed'
+
+
+class Node(EmbeddedModel):
+    type: str
+    parameters: dict
+
+
+class Edge(EmbeddedModel):
+    input_node: int
+    output_node: int
+
+
+class Pipeline(Model):
+    name: str
+    project_id: ObjectId
+    prefect_flow_id: str
+    nodes: List[Node]
+    edges: List[Edge]
+    description: str = ''
+    tags: List[str] = []
+    deleted: bool = False
+
+
+class PipelineRun(Model):
+    pipeline_id: ObjectId
+    prefect_flow_run_id: str
+    scheduled_by: ObjectId
+
+
+class NodeRun(Model):
+    pipeline_run_id: ObjectId
+    started_at: datetime
+    finished_at: datetime
+    status: RunStatus
+
+
 QueryExpression.update_forward_refs()
 
 client = AsyncIOMotorClient(Config.MONGO_HOST)

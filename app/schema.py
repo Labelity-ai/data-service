@@ -1,12 +1,13 @@
 from typing import List, Optional, Dict, Any, Union, Tuple
 from enum import Enum
+from datetime import datetime
 from functools import partial
 from pydantic import BaseModel, validator
 from fastapi_utils.camelcase import snake2camel
 
 from app.utils import json_dumps, json_loads
 from app.models import EmbeddedModel, ModelConfig, ObjectId, Label, check_relative_points,\
-    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations
+    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations, Node, Edge, RunStatus
 
 
 class SchemaBase(BaseModel):
@@ -153,3 +154,20 @@ class ImageData(SchemaBase):
     height: int
 
     #created_time: datetime
+
+
+class PipelinePostData(SchemaBase):
+    name: str
+    nodes: List[Node]
+    edges: List[Edge]
+    description: str
+    tags: List[str]
+
+
+class PipelineRunInfo(SchemaBase):
+    id: ObjectId
+    pipeline_id: ObjectId
+    started_at: datetime
+    finished_at: datetime
+    status: RunStatus
+    scheduled_by: ObjectId

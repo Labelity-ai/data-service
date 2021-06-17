@@ -49,10 +49,10 @@ class AnnotationsService:
 
     @staticmethod
     async def run_raw_annotations_pipeline(pipeline: List[dict],
-                                           page_size: Optional[int], page: Optional[int],
+                                           page_size: Optional[int],
+                                           page: Optional[int],
                                            project_id: ObjectId) -> AnnotationsQueryResult:
         pipeline = [{'$match': {'project_id': project_id}}] + pipeline
-
         pipeline = make_paginated_pipeline(pipeline, page_size, page)
         collection = engine.get_collection(ImageAnnotations)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
@@ -94,7 +94,8 @@ class AnnotationsService:
 
     @staticmethod
     async def run_annotations_pipeline(query: List[QueryStage],
-                                       page_size: int, page: int,
+                                       page_size: int,
+                                       page: int,
                                        project: Project) -> AnnotationsQueryResult:
         pipeline = []
 
