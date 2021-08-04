@@ -5,8 +5,8 @@ from prefect import Flow
 from prefect.run_configs import UniversalRun
 from prefect.storage import S3
 
-from app.schema import PipelinePostData, PipelineRunInfo
-from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, Edge, RunStatus
+from app.schema import PipelinePostData
+from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, Edge
 from app.config import Config
 from app.models import Project
 
@@ -88,7 +88,7 @@ class PipelinesService:
         engine.save(pipeline)
 
     @staticmethod
-    async def run_pipeline(pipeline: Pipeline, project_id: ObjectId) -> PipelineRun:
+    async def run_pipeline(pipeline: Pipeline) -> PipelineRun:
         run_id = client.create_flow_run(pipeline.prefect_flow_id)
         run = PipelineRun(
             pipeline_id=pipeline.id,
@@ -103,7 +103,6 @@ class PipelinesService:
                                           PipelineRun.pipeline_id == pipeline.id,
                                           limit=limit,
                                           skip=page * limit)
-
         flow_runs_info = [client.get_flow_run_info(run.prefect_flow_run_id) for run in pipeline_runs]
         result = []
         # TODO

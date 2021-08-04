@@ -1,9 +1,16 @@
+from typing import List
+import s3fs
 from prefect import task
 from app.services.annotations import AnnotationsService
+from app.models import ImageAnnotations
+from app.config import Config
+
+s3_fs = s3fs.S3FileSystem()
 
 
 @task
-def human_in_the_loop_in(annotations):
+def human_in_the_loop(annotations: List[ImageAnnotations]):
+    s3_fs.open(f'{Config.DATASET_ARTIFACTS_BUCKET}/{Config.DATASET_CACHE_FOLDER}/{}')
     # Store annotations in S3
     # Generate link
     # Send notification

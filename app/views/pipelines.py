@@ -41,4 +41,4 @@ class PipelinesView:
     @router.post("/pipeline/{id}/runs")
     async def run_pipeline(self, id):
         pipeline = await self.get_pipeline(id)
-        return await PipelinesService.run_pipeline(pipeline, self.project.id)
+        return await PipelinesService.run_pipeline(pipeline)
