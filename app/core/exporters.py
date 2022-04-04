@@ -41,7 +41,7 @@ def create_datumaro_dataset(annotations: List[ImageAnnotationsData]):
                       h=det.box[3] - det.box[1])
                  for det in image_annotations.detections]
 
-        tags = [Label(label=tag.label, attributes=tag.attributes)
+        tags = [Label(label=labels_index[tag.label], attributes=tag.attributes)
                 for tag in image_annotations.tags]
 
         points = [Points(label=labels_index[points.label],

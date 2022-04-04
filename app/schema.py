@@ -171,3 +171,7 @@ class PipelineRunInfo(SchemaBase):
     finished_at: datetime
     status: RunStatus
     scheduled_by: ObjectId
+
+
+class JobId(SchemaBase):
+    job_id: str

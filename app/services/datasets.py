@@ -2,11 +2,17 @@ from typing import List, Optional, Union
 from datetime import datetime, timedelta
 from enum import Enum
 import json
+import tempfile
 
-import cloudpickle
 from fastapi import HTTPException
 from odmantic import ObjectId
+from zipfile import ZipFile, ZIP_DEFLATED
+
 import s3fs
+from datumaro.components.dataset import DatasetItem
+from datumaro.util.image import Image
+from rq.decorators import job
+from rq.job import Job
 
 from app.schema import DatasetPostSchema, DatasetGetSortQuery, DatasetToken, \
     ImageAnnotationsData, DatasetPatchSchema
@@ -17,6 +23,9 @@ from app.core.aggregations import GET_LABELS_PIPELINE
 from app.core.exporters import create_datumaro_dataset, DatasetExportFormat
 from app.security import create_fast_jwt_token
 from app.config import Config
+from app.utils import zip_dir
+from app.core.queue import redis
+
 
 s3_fs = s3fs.S3FileSystem()
 
@@ -27,16 +36,14 @@ class DatasetExportingStatus(Enum):
     FINISHED = 'finished'
 
 
+def _get_dataset_exporting_zip_name(dataset: Dataset, format: DatasetExportFormat):
+    return f'{dataset.name}_{format.value}_v{dataset.version}.zip'
+
+
 def _get_dataset_exporting_result_key(dataset: Dataset, format: DatasetExportFormat):
     return f'{Config.DATASET_ARTIFACTS_BUCKET}/' \
            f'{Config.DATASET_EXPORTING_RESULTS_FOLDER}/' \
-           f'{dataset.project_id}/{dataset.name}/{dataset.name}_{format.value}_v{dataset.version}.zip'
-
-
-def _get_dataset_exporting_request_key(dataset: Dataset, format: DatasetExportFormat):
-    return f'{Config.DATASET_ARTIFACTS_BUCKET}/' \
-           f'{Config.DATASET_EXPORTING_QUEUE_FOLDER}/' \
-           f'{dataset.project_id}/{dataset.name}/{dataset.name}_{format.value}_v{dataset.version}.pkl'
+           f'{dataset.project_id}/{dataset.name}/{_get_dataset_exporting_zip_name(dataset, format)}'
 
 
 def _get_dataset_snapshot_key(dataset: Dataset):
@@ -44,6 +51,38 @@ def _get_dataset_snapshot_key(dataset: Dataset):
            f'{Config.DATASET_SNAPSHOT_FOLDER}/' \
            f'{dataset.project_id}/' \
            f'{dataset.id}.json'
+
+
+@job('dataset', connection=redis)
+def _create_dataset_zip(dataset: Dataset, format: DatasetExportFormat):
+    annotations = await DatasetService._get_dataset_snapshot(dataset)
+    dataset_datumaro = create_datumaro_dataset(annotations)
+    zip_name = _get_dataset_exporting_zip_name(dataset, format)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for row in dataset_datumaro:
+            item: DatasetItem = row
+
+            if not item.has_image:
+                continue
+
+            image_filename = item.image.path.split('/')[-1]
+            image_path = f'{tmpdir}/{image_filename}'
+            s3_fs.get(f'{Config.IMAGE_STORAGE_BUCKET}/raw/{dataset.project_id}/{image_filename}', image_path)
+            item.image = Image(path=image_path, size=item.image.size)
+
+        dataset_folder = f'/tmp/{zip_name}'
+        dataset_datumaro.export(dataset_folder, format.value, save_images=True)
+
+        zip_filename = f'/tmp/{dataset.id}.zip'
+        zip_file = ZipFile(zip_filename, 'w', ZIP_DEFLATED)
+        zip_dir(dataset_folder, zip_file)
+        zip_file.close()
+
+        output_key = _get_dataset_exporting_result_key(dataset, format)
+        s3_fs.put(zip_filename, output_key)
+
+        return output_key
 
 
 class DatasetService:
@@ -189,36 +228,22 @@ class DatasetService:
         return [Label(name=doc['name'], attributes=doc['attributes'], shape=doc['shape']) for doc in labels]
 
     @staticmethod
-    async def get_dataset_download_url(dataset: Dataset, format: DatasetExportFormat) -> str:
-        key = _get_dataset_exporting_result_key(dataset, format)
-        return await StorageService.create_presigned_get_url_for_object_download(key)
+    async def get_dataset_download_url(job_id: str) -> Optional[str]:
+        try:
+            job = Job.fetch(job_id)
+            key = job.result
+            if not key:
+                return None
+            return await StorageService.create_presigned_get_url_for_object_download(key)
+        except Exception:
+            return None
 
     @staticmethod
     async def download_dataset(dataset: Dataset, format: DatasetExportFormat) -> DatasetExportingStatus:
-        request_file_key = _get_dataset_exporting_request_key(dataset, format)
-        result_file_key = _get_dataset_exporting_result_key(dataset, format)
-
-        s3_fs.invalidate_cache()
-
-        if s3_fs.exists(result_file_key):
-            try:
-                s3_fs.rm(request_file_key)
-            except:
-                pass
-            finally:
-                return DatasetExportingStatus.FINISHED
-
-        if s3_fs.exists(request_file_key):
-            return DatasetExportingStatus.QUEUED
-
         annotations = await DatasetService._get_dataset_snapshot(dataset)
         dataset = create_datumaro_dataset(annotations)
-
-        with s3_fs.open(request_file_key, 'wb') as file:
-            data = {'dataset': dataset, 'format': format.value}
-            cloudpickle.dump(data, file)
-
-        return DatasetExportingStatus.STARTED
+        job = _create_dataset_zip.delay(dataset=dataset, format=format)
+        return job.id
 
     @staticmethod
     async def create_access_token(dataset: Dataset, expires_delta: Optional[timedelta] = None):

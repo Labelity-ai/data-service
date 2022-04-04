@@ -3,14 +3,14 @@ from typing import List
 from fastapi_utils.api_model import APIMessage
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
-from fastapi import Depends, status, Response
+from fastapi import Depends, Response
 from odmantic import ObjectId
 
 from app.schema import DatasetPostSchema, DatasetGetSortQuery, \
-    DatasetToken, ImageAnnotationsData, DatasetPatchSchema
+    DatasetToken, ImageAnnotationsData, DatasetPatchSchema, JobId
 from app.models import Dataset, Label, Project, FastToken
 from app.security import get_project, get_dataset_token
-from app.services.datasets import DatasetService, DatasetExportingStatus, DatasetExportFormat
+from app.services.datasets import DatasetService, DatasetExportFormat
 
 router = InferringRouter(
     tags=["datasets"],
@@ -62,19 +62,16 @@ class DatasetsViewBase:
 
     @staticmethod
     async def download_dataset(id: ObjectId, project_id: ObjectId,
-                               format: DatasetExportFormat, response: Response) -> APIMessage:
+                               format: DatasetExportFormat, response: Response) -> JobId:
         dataset = await DatasetService.get_dataset_by_id(id, project_id)
-        export_status = await DatasetService.download_dataset(dataset, format)
+        job_id = await DatasetService.download_dataset(dataset, format)
+        response.status_code = 202
+        return JobId(job_id=job_id)
 
-        if export_status == DatasetExportingStatus.STARTED:
-            response.status_code = status.HTTP_202_ACCEPTED
-            return APIMessage(detail='Starting dataset exporting')
-        elif export_status == DatasetExportingStatus.QUEUED:
-            response.status_code = status.HTTP_202_ACCEPTED
-            return APIMessage(detail='Dataset exporting in progress')
-        elif export_status == DatasetExportingStatus.FINISHED:
-            url = await DatasetService.get_dataset_download_url(dataset, format)
-            return APIMessage(detail=url)
+    @staticmethod
+    async def get_dataset_download_url(job_id: str) -> APIMessage:
+        url = DatasetService.get_dataset_download_url(job_id)
+        return APIMessage(detail=url)
 
     @staticmethod
     def get_export_formats() -> List[str]:
@@ -125,8 +122,12 @@ class DatasetsView:
         return await DatasetService.create_access_token(dataset)
 
     @router.get("/dataset/{id}/download")
-    async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> APIMessage:
+    async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> JobId:
         return await DatasetsViewBase.download_dataset(id, self.project.id, format, response)
+
+    @router.get("/dataset/{id}/download_url")
+    async def download_dataset(self, job_id: str) -> APIMessage:
+        return await DatasetsViewBase.get_dataset_download_url(job_id)
 
     @router.get("/dataset/{id}/revisions")
     async def download_dataset(self, id: ObjectId) -> List[Dataset]:
@@ -160,10 +161,14 @@ class DatasetsSharedView:
         )
 
     @router.get("/dataset_shared/download")
-    async def download_dataset(self, format: DatasetExportFormat, response: Response) -> APIMessage:
+    async def download_dataset(self, format: DatasetExportFormat, response: Response) -> JobId:
         return await DatasetsViewBase.download_dataset(
             self.dataset_token.dataset_id, self.dataset_token.project_id, format, response
         )
+
+    @router.get("/dataset/{id}/download_url")
+    async def download_dataset(self, job_id: str) -> APIMessage:
+        return await DatasetsViewBase.get_dataset_download_url(job_id)
 
     @router.get("/meta/dataset_shared/formats")
     def get_export_formats(self) -> List[str]:
