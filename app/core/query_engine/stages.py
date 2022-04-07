@@ -696,6 +696,24 @@ class SetLabelAttribute(EmbeddedModel):
         return cls.schema()
 
 
+def make_generic_paginated_pipeline(pipeline: List[dict], page_size: int = None, page: int = None):
+    if page is not None and page_size is not None:
+        data_pipeline = [
+            {'$skip': page * page_size},
+            {'$limit': page_size},
+        ]
+    else:
+        data_pipeline = []
+
+    stage = {
+        '$facet': {
+            'metadata': [{'$count': 'total'}, {'$addFields': {'page': page}}],
+            'data': data_pipeline
+        }
+    }
+    return pipeline + [stage]
+
+
 def make_paginated_pipeline(pipeline: List[dict], page_size: int = None, page: int = None):
     image_lookup = {
         '$lookup': {

@@ -7,14 +7,13 @@ from fastapi_utils.inferring_router import InferringRouter
 from fastapi import Depends, HTTPException, status, File, UploadFile
 
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult, \
-    ImageAnnotationsPutSchema, ImageAnnotationsPatchSchema
+    ImageAnnotationsPutSchema, ImageAnnotationsPatchSchema, QueryPipelinePost
 from app.models import ImageAnnotations, Project
 from app.security import get_project
 from app.config import Config
 from app.services.annotations import AnnotationsService, AnnotationSortDirection, AnnotationSortField
 from app.services.storage import StorageService
 from app.core.importers import DatasetImportFormat
-from app.core.query_engine.stages import QueryStage
 
 router = InferringRouter(
     tags=["annotations"],
@@ -41,7 +40,7 @@ class AnnotationsView:
             sort_direction=sort_direction)
 
     @router.post("/annotations/pipeline")
-    async def run_annotations_pipeline(self, query: List[QueryStage],
+    async def run_annotations_pipeline(self, query: QueryPipelinePost,
                                        page: int = 0, page_size: int = 10) -> AnnotationsQueryResult:
         return await AnnotationsService.run_annotations_pipeline(
             query=query, page_size=int(page_size), page=int(page), project=self.project)

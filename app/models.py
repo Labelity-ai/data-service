@@ -196,14 +196,15 @@ class QueryExpression(BaseModel):
 
 class NodeOperation(enum.Enum):
     ANNOTATIONS = 'annotations'
+    QUERY_PIPELINE = 'query_pipeline'
     WEBHOOK = 'webhook'
     DATASET = 'dataset'
+    REVISION = 'revision'
     CVAT = 'cvat'
 
 
 class NodeType(enum.Enum):
     INPUT = 'input'
-    PROCESSING = 'processing'
     OUTPUT = 'output'
 
 
@@ -214,21 +215,17 @@ class RunStatus(enum.Enum):
 
 
 class Node(EmbeddedModel):
+    input_node_index: int
+    output_node_index: int
     type: NodeType
     operation: NodeOperation
-    parameters: dict
-
-
-class Edge(EmbeddedModel):
-    input_node: int
-    output_node: int
+    payload: dict
 
 
 class Pipeline(Model):
     name: str
     project_id: ObjectId
     nodes: List[Node]
-    edges: List[Edge]
     description: str = ''
     tags: List[str] = []
     deleted: bool = False
@@ -240,7 +237,7 @@ class PipelineRun(Model):
     scheduled_by: Optional[ObjectId]
     started_at: datetime
     finished_at: Optional[datetime]
-    status: RunStatus
+    nodes_status: List[RunStatus]
 
 
 class RevisionComment(Model):

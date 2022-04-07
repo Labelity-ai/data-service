@@ -1,28 +1,33 @@
 from typing import List
-
-import prefect
-from prefect import Flow
-from prefect.run_configs import UniversalRun
-from prefect.storage import S3
+from datetime import datetime
+from rq.decorators import job
 
 from app.schema import PipelinePostData
-from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, Edge
-from app.config import Config
+from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, Edge, RunStatus, NodeType
+from app.core.queue import redis
 from app.models import Project
-
-client = prefect.Client(api_token=Config.PREFECT_API_KEY)
-
-
-def create_prefect_flow(id: ObjectId, requires_gpu=False):
-    label = 'gpu' if requires_gpu else 'cpu'
-    return Flow(str(id),
-                storage=S3(bucket=Config.PREFECT_CODE_BUCKET),
-                run_config=UniversalRun(labels=[label]))
 
 
 def check_unconnected_nodes(nodes: List[Node], edges: List[Edge]):
     connected_nodes = set(edge.input_node for edge in edges) | set(edge.output_node for edge in edges)
     return [node for i, node in enumerate(nodes) if i not in connected_nodes]
+
+
+@job(queue='pipelines', connection=redis)
+async def _run_pipeline(pipeline: Pipeline):
+
+    data_processing_nodes = [node for node in pipeline.nodes if node.type == NodeType.PROCESSING]
+
+
+
+
+    input_nodes = [node for node in pipeline.nodes if node.type == NodeType.INPUT]
+    output_nodes = [node for node in pipeline.nodes if node.type == NodeType.OUTPUT]
+
+    # TODO Pipeline composition and execution
+    run = await engine.find_one(PipelineRun, PipelineRun.pipeline_id == pipeline.id)
+    run.finished_at = datetime.now()
+    await engine.save(run)
 
 
 def check_graph_cycles(nodes: List[Node], edges: List[Edge]):
@@ -69,9 +74,6 @@ class PipelinesService:
             - Check graph consistency (preprocessing -> transformations -> inference)
         """
         pipeline_instance = await engine.save(pipeline_instance)
-        flow = create_prefect_flow(pipeline_instance.id)
-        flow_id = flow.register(project_name=Config.PREFECT_PROJECT_NAME)
-        pipeline_instance.prefect_flow_id = flow_id
         return await engine.save(pipeline_instance)
 
     @staticmethod
@@ -89,23 +91,29 @@ class PipelinesService:
 
     @staticmethod
     async def run_pipeline(pipeline: Pipeline) -> PipelineRun:
-        run_id = client.create_flow_run(pipeline.prefect_flow_id)
+        job = _run_pipeline(pipeline)
         run = PipelineRun(
             pipeline_id=pipeline.id,
-            prefect_flow_run_id=run_id,
+            job_id=job.id,
+            status=RunStatus.IN_PROGRESS,
+            started_at=datetime.now(),
+            finished_at=None,
             scheduled_by=None
         )
         return await engine.save(run)
 
     @staticmethod
     async def get_pipeline_runs(pipeline: Pipeline, page: int, limit: int):
-        pipeline_runs = await engine.find(PipelineRun,
-                                          PipelineRun.pipeline_id == pipeline.id,
-                                          limit=limit,
-                                          skip=page * limit)
-        flow_runs_info = [client.get_flow_run_info(run.prefect_flow_run_id) for run in pipeline_runs]
-        result = []
+        return await engine.find(
+            PipelineRun,
+            PipelineRun.pipeline_id == pipeline.id,
+            limit=limit,
+            skip=page * limit)
+
+    @staticmethod
+    async def get_pipeline_run_logs(run: PipelineRun):
         # TODO
+        pass
 
     @staticmethod
     async def add_scheduler(pipeline_id: ObjectId, project: Project):

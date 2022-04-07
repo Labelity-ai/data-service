@@ -2,13 +2,14 @@ from typing import List, Optional, Dict, Any, Union, Tuple
 from enum import Enum
 from datetime import datetime
 from functools import partial
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, root_validator
 from fastapi_utils.camelcase import snake2camel
 
+from app.core.query_engine.stages import QueryStage
 from app.utils import json_dumps, json_loads
 from app.models import ObjectId, Label, check_relative_points,\
-    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations, Node, Edge, RunStatus, \
-    Revision, RevisionChange
+    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations, RunStatus,\
+    Revision, RevisionChange, NodeOperation, NodeType, Node
 
 
 class SchemaBase(BaseModel):
@@ -161,10 +162,77 @@ class ImageData(SchemaBase):
     #created_time: datetime
 
 
+class WebhookNodePayload(SchemaBase):
+    url: str
+    fields: List[str]
+
+    @validator('fields')
+    def fields_should_exit(cls, value):
+        for field in value:
+            if field not in ImageAnnotationsData.__fields__:
+                raise ValueError(f'{field} is not a valid field name')
+
+
+class DatasetOutputNodePayload(SchemaBase):
+    class Mode(Enum):
+        append = 'append'
+        override = 'override'
+
+    name: Optional[str] = None
+    dataset_id: Optional[ObjectId] = None
+    mode: Mode = Mode.override
+
+
+class DatasetInputNodePayload(SchemaBase):
+    dataset_id: Optional[ObjectId] = None
+
+
+class CVATOutputNodePayload(SchemaBase):
+    task_name: str = None
+    cvat_project_id: Optional[str] = None
+    labels_mapping: Dict[str, str] = {}
+
+
+class CVATInputNodePayload(SchemaBase):
+    task_search: Optional[str] = None
+    task_ids: Optional[List[str]] = None
+    project_id: Optional[str] = None
+    labels_mapping: Dict[str, str] = {}
+
+
+class NodeData(Node):
+    @root_validator
+    def validate_root(cls, values):
+        payload = values['payload']
+        operation = values['operation']
+        node_type = values['type']
+
+        if operation == NodeOperation.QUERY_PIPELINE:
+            QueryPipelinePost(**payload)
+        elif operation == NodeOperation.WEBHOOK:
+            WebhookNodePayload(**payload)
+        elif operation == NodeOperation.DATASET:
+            if node_type == NodeType.INPUT:
+                DatasetInputNodePayload(**payload)
+            else:
+                DatasetOutputNodePayload(**payload)
+        elif operation == NodeOperation.CVAT:
+            if node_type == NodeType.INPUT:
+                CVATInputNodePayload(**payload)
+            else:
+                CVATOutputNodePayload(**payload)
+        elif operation == NodeOperation.REVISION:
+            PostRevision(**payload)
+        elif operation == NodeOperation.ANNOTATIONS:
+            # Payload will not be used for this case
+            values['payload'] = {}
+
+        return values
+
+
 class PipelinePostData(SchemaBase):
     name: str
-    nodes: List[Node]
-    edges: List[Edge]
+    nodes: List[NodeData]
     description: str
     tags: List[str]
 
@@ -218,3 +286,7 @@ class RevisionQueryResult(SchemaBase):
 class RevisionChangesQueryResult(SchemaBase):
     data: List[RevisionChange]
     pagination: Pagination
+
+
+class QueryPipelinePost(SchemaBase):
+    steps: List[QueryStage]
