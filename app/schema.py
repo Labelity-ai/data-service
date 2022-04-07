@@ -6,8 +6,9 @@ from pydantic import BaseModel, validator
 from fastapi_utils.camelcase import snake2camel
 
 from app.utils import json_dumps, json_loads
-from app.models import EmbeddedModel, ModelConfig, ObjectId, Label, check_relative_points,\
-    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations, Node, Edge, RunStatus
+from app.models import ObjectId, Label, check_relative_points,\
+    Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations, Node, Edge, RunStatus, \
+    Revision, RevisionChange
 
 
 class SchemaBase(BaseModel):
@@ -125,16 +126,20 @@ class DatasetGetSortQuery(Enum):
     UPDATED_AT = 'updated_at'
 
 
-class AnnotationsQueryResult(EmbeddedModel):
-    class Pagination(BaseModel):
-        page: Optional[int]
-        total: Optional[int]
+class SortDirection(str, Enum):
+    ASCENDING = 'ascending'
+    DESCENDING = 'descending'
 
+
+class Pagination(BaseModel):
+    page: Optional[int]
+    total: Optional[int]
+
+
+class AnnotationsQueryResult(SchemaBase):
     data: List[ImageAnnotationsData]
     pagination: Pagination
-    pipeline_id: Optional[ObjectId] = None
-
-    Config = ModelConfig
+    pipeline_id: Optional[str] = None
 
 
 class ApiKey(SchemaBase):
@@ -175,3 +180,41 @@ class PipelineRunInfo(SchemaBase):
 
 class JobId(SchemaBase):
     job_id: str
+
+
+class PostPutRevisionComment(SchemaBase):
+    content: str
+
+
+class PostRevisionChange(SchemaBase):
+    event_id: str
+    tags: List[str]
+
+
+class PutRevisionChange(SchemaBase):
+    tags: List[str]
+
+
+class PostRevision(SchemaBase):
+    assignees: List[ObjectId]
+    description: str
+
+
+class PatchRevision(SchemaBase):
+    assignees: Optional[List[ObjectId]] = None
+    description: Optional[str] = None
+
+
+class RevisionGetSortQuery(Enum):
+    CREATED_AT = 'created_at'
+    UPDATED_AT = 'updated_at'
+
+
+class RevisionQueryResult(SchemaBase):
+    data: List[Revision]
+    pagination: Pagination
+
+
+class RevisionChangesQueryResult(SchemaBase):
+    data: List[RevisionChange]
+    pagination: Pagination

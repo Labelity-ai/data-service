@@ -243,30 +243,29 @@ class PipelineRun(Model):
     status: RunStatus
 
 
-class RevisionComment(EmbeddedModel):
+class RevisionComment(Model):
+    revision_change_id: ObjectId
     author_id: ObjectId
     content: str
-    created_date: datetime
-    edited_date: datetime
+    created_at: datetime
+    updated_at: datetime
 
 
 class RevisionChange(Model):
     event_id: str
     revision_id: ObjectId
     author_id: ObjectId
-    added_tags: List[str]
-    removed_tags: List[str]
-    created_date: datetime
-    edited_date: datetime
-    comments: List[RevisionComment]
+    tags: List[str]
+    created_at: datetime
+    updated_at: datetime
 
 
 class Revision(Model):
     project_id: ObjectId
     created_by: ObjectId
     created_at: datetime
-    assignee: List[ObjectId]
-    changes: List[RevisionChange]
+    updated_at: datetime
+    assignees: List[ObjectId]
     description: str
 
 
@@ -306,5 +305,10 @@ async def initialize():
     await engine.get_collection(RevisionChange).create_index([
         ('revision_id', DESCENDING),
         ('event_id', DESCENDING),
+        ('author_id', DESCENDING),
+    ])
+
+    await engine.get_collection(RevisionComment).create_index([
+        ('revision_change_id', DESCENDING),
         ('author_id', DESCENDING),
     ])
