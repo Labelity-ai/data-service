@@ -194,12 +194,17 @@ class QueryExpression(BaseModel):
     Config = ModelConfig
 
 
+class NodeOperation(enum.Enum):
+    ANNOTATIONS = 'annotations'
+    WEBHOOK = 'webhook'
+    DATASET = 'dataset'
+    CVAT = 'cvat'
+
+
 class NodeType(enum.Enum):
     INPUT = 'input'
+    PROCESSING = 'processing'
     OUTPUT = 'output'
-    DATA_PROCESSING = 'data_processing'
-    DATA_AUGMENTATION = 'data_augmentation'
-    INFERENCE = 'inference'
 
 
 class RunStatus(enum.Enum):
@@ -209,7 +214,8 @@ class RunStatus(enum.Enum):
 
 
 class Node(EmbeddedModel):
-    type: str
+    type: NodeType
+    operation: NodeOperation
     parameters: dict
 
 
@@ -221,7 +227,6 @@ class Edge(EmbeddedModel):
 class Pipeline(Model):
     name: str
     project_id: ObjectId
-    prefect_flow_id: str
     nodes: List[Node]
     edges: List[Edge]
     description: str = ''
@@ -231,15 +236,38 @@ class Pipeline(Model):
 
 class PipelineRun(Model):
     pipeline_id: ObjectId
-    prefect_flow_run_id: str
-    scheduled_by: ObjectId
-
-
-class NodeRun(Model):
-    pipeline_run_id: ObjectId
+    job_id: str
+    scheduled_by: Optional[ObjectId]
     started_at: datetime
-    finished_at: datetime
+    finished_at: Optional[datetime]
     status: RunStatus
+
+
+class RevisionComment(EmbeddedModel):
+    author_id: ObjectId
+    content: str
+    created_date: datetime
+    edited_date: datetime
+
+
+class RevisionChange(Model):
+    event_id: str
+    revision_id: ObjectId
+    author_id: ObjectId
+    added_tags: List[str]
+    removed_tags: List[str]
+    created_date: datetime
+    edited_date: datetime
+    comments: List[RevisionComment]
+
+
+class Revision(Model):
+    project_id: ObjectId
+    created_by: ObjectId
+    created_at: datetime
+    assignee: List[ObjectId]
+    changes: List[RevisionChange]
+    description: str
 
 
 QueryExpression.update_forward_refs()
@@ -268,3 +296,15 @@ async def initialize():
     ], unique=True)
     await engine.get_collection(Image).create_index('created_time')
     await engine.get_collection(FastToken).create_index('dataset_id')
+    await engine.get_collection(PipelineRun).create_index('pipeline_id')
+
+    await engine.get_collection(Revision).create_index([
+        ('project_id', DESCENDING),
+        ('created_by', DESCENDING),
+    ])
+
+    await engine.get_collection(RevisionChange).create_index([
+        ('revision_id', DESCENDING),
+        ('event_id', DESCENDING),
+        ('author_id', DESCENDING),
+    ])
