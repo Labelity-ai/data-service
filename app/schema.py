@@ -237,6 +237,13 @@ class PipelinePostData(SchemaBase):
     tags: List[str]
 
 
+class PipelinePatchData(SchemaBase):
+    name: Optional[str] = None
+    nodes: Optional[List[NodeData]]
+    description: Optional[str]
+    tags: Optional[List[str]]
+
+
 class PipelineRunInfo(SchemaBase):
     id: ObjectId
     pipeline_id: ObjectId

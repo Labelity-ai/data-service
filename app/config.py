@@ -13,6 +13,8 @@ class Config:
     RAW_IMAGES_FOLDER = os.environ.get('RAW_IMAGES_FOLDER', 'raw')
     VIDEOS_FOLDER = os.environ.get('VIDEOS_FOLDER', 'videos')
     THUMBNAILS_FOLDER = os.environ.get('THUMBNAILS_FOLDER', 'thumbnails')
+    THUMBNAILS_MAX_WIDTH = int(os.environ.get('THUMBNAILS_WIDTH', '500'))
+    THUMBNAILS_MAX_HEIGHT = int(os.environ.get('THUMBNAILS_MAX_HEIGHT', '500'))
     DATASET_ARTIFACTS_BUCKET = os.environ.get('DATASET_ARTIFACTS_BUCKET', 'labelity-use-dev-artifacts')
     DATASET_EXPORTING_QUEUE_FOLDER = os.environ.get('DATASET_EXPORTING_QUEUE_FOLDER', 'datasets/queue')
     DATASET_EXPORTING_RESULTS_FOLDER = os.environ.get('DATASET_EXPORTING_RESULTS_FOLDER', 'datasets/compiled')
@@ -27,6 +29,5 @@ class Config:
     VIDEO_FPS_LIMIT = int(os.environ.get('VIDEO_FPS_LIMIT', 5))
     JWT_ALGORITHM = "HS512"
     FAST_TOKEN_JWT_ALGORITHM = "HS256"
-    PREFECT_CODE_BUCKET = os.environ.get('PREFECT_CODE_BUCKET' 'labelity-use1-dev-prefect-code')
-    PREFECT_PROJECT_NAME = os.environ.get('PREFECT_PROJECT_NAME' 'development')
-    PREFECT_API_KEY = os.environ.get('PREFECT_PROJECT_NAME')
+    PIPELINES_LOGS_BUCKET = os.environ.get('PIPELINES_LOGS_BUCKET' 'labelity-use-dev-logs')
+    PIPELINES_LOGS_FOLDER = os.environ.get('PIPELINES_LOGS_BUCKET' 'pipelines')
