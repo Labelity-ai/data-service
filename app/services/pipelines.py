@@ -4,79 +4,61 @@ from rq.decorators import job
 from fastapi import HTTPException
 import aioboto3
 from odmantic import query
+import graphlib
 
 from app.schema import PipelinePostData, PipelinePatchData
 from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, RunStatus, NodeType
 from app.core.queue import redis
+from app.core.pipeline_operations import INPUT_NODE_OPERATIONS, OUTPUT_NODE_OPERATIONS
 from app.models import Project
 from app.config import Config
-
-
-def check_unconnected_nodes(nodes: List[Node], edges: List[Edge]):
-    connected_nodes = set(edge.input_node for edge in edges) | set(edge.output_node for edge in edges)
-    return [node for i, node in enumerate(nodes) if i not in connected_nodes]
 
 
 def generate_pipeline_run_logs_s3_key(project: Project, run: PipelineRun):
     return f'{Config.PIPELINES_LOGS_FOLDER}/{project.id}/{run.pipeline_id}/{run.id}'
 
 
+async def execute_node(node: Node, inputs: list):
+    if node.type == NodeType.INPUT:
+        operation, schema_class = INPUT_NODE_OPERATIONS[node.type]
+    else:
+        operation, schema_class = OUTPUT_NODE_OPERATIONS[node.type]
+    parameters = schema_class(**node.payload)
+    return await operation(parameters, *inputs)
+
+
 @job(queue='pipelines', connection=redis)
-async def _run_pipeline(pipeline: Pipeline):
+async def _run_pipeline(pipeline_id: ObjectId, nodes: List[Node]):
+    outputs = []
 
-    data_processing_nodes = [node for node in pipeline.nodes if node.type == NodeType.PROCESSING]
-    input_nodes = [node for node in pipeline.nodes if node.type == NodeType.INPUT]
-    output_nodes = [node for node in pipeline.nodes if node.type == NodeType.OUTPUT]
+    for i, node in enumerate(nodes):
+        inputs = [outputs[x] for x in node.input_nodes]
+        results = execute_node(node, inputs)
+        outputs[i] = results
 
-    # TODO Pipeline composition and execution
-    run = await engine.find_one(PipelineRun, PipelineRun.pipeline_id == pipeline.id)
+    run = await engine.find_one(PipelineRun, PipelineRun.pipeline_id == pipeline_id)
     run.finished_at = datetime.now()
     await engine.save(run)
 
 
-def check_graph_cycles(nodes: List[Node], edges: List[Edge]):
-    in_degrees = {}
-
-    for node in nodes:
-        in_degrees[node] = 0
-
-    for edge in edges:
-        in_degrees[nodes[edge.output_node]] += 1
-
-    queue = []
-
-    for node, in_degree in in_degrees.items():
-        if in_degree == 0:
-            queue.append(node)
-
-    counter = 0
-
-    while queue:
-        nu = queue.pop(0)
-        nu_id = [i for i, node in enumerate(nodes) if node == nu][0]
-        neighbors = [nodes[edge.input_node] for edge in edges if edge.input_node == nu_id]
-
-        for v in neighbors:
-            in_degrees[v] -= 1
-
-            if in_degrees[v] == 0:
-                queue.append(v)
-        counter += 1
-
-    return counter != len(nodes)
+def check_graph_correctness_and_optimize(pipeline: Pipeline) -> List[Node]:
+    try:
+        graph = {i: set(node.input_nodes) for i, node in enumerate(pipeline.nodes)}
+        sorter = graphlib.TopologicalSorter(graph)
+        order = sorter.static_order()
+        nodes = [pipeline.nodes[i] for i in order]
+        # TODO: Merge consecutive query pipelines
+        # TODO: Check graph consistency (query pipeline before custom/output/merger and nothing depends on output node)
+        return nodes
+    except graphlib.CycleError as error:
+        raise HTTPException(400, f'Pipeline contains cycles. Detail: {error}')
 
 
 class PipelinesService:
     @staticmethod
     async def create_pipeline(pipeline: PipelinePostData, project: Project) -> Pipeline:
         pipeline_instance = Pipeline(**pipeline.dict(), project_id=project.id, prefect_flow_id='')
-        has_cycles = check_graph_cycles(pipeline.nodes, pipeline.edges)
-        unconnected_nodes = check_unconnected_nodes(pipeline.nodes, pipeline.edges)
-
-        """
-        TODO:
-            - Check graph consistency (preprocessing -> transformations -> inference)
-        """
+        check_graph_correctness_and_optimize(pipeline_instance)
         pipeline_instance = await engine.save(pipeline_instance)
         return await engine.save(pipeline_instance)
 
@@ -106,8 +88,7 @@ class PipelinesService:
             pipeline.description = data.description
         if data.tags is not None:
             pipeline.tags = data.tags
-
-        # TODO: Pipeline correctness checks
+        check_graph_correctness_and_optimize(pipeline)
         return await engine.save(pipeline)
 
     @staticmethod
@@ -121,6 +102,8 @@ class PipelinesService:
             finished_at=None,
             scheduled_by=None
         )
+        nodes = check_graph_correctness_and_optimize(pipeline)
+        _run_pipeline.delay(pipeline.id, nodes)
         return await engine.save(run)
 
     @staticmethod

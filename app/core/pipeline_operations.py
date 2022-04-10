@@ -4,14 +4,15 @@ from rq.decorators import job
 import requests
 
 from app.services.annotations import AnnotationsService
-from app.models import ImageAnnotations
+from app.models import ImageAnnotations, NodeOperation
+from app.schema import MergeNodePayload, CVATInputNodePayload, DatasetInputNodePayload, \
+    WebhookNodePayload, CVATOutputNodePayload, DatasetOutputNodePayload, QueryPipelinePost
 from app.config import Config
 from app.core.queue import redis
 
 s3_fs = s3fs.S3FileSystem()
 
 
-@job(queue='pipelines', connection=redis)
 def human_in_the_loop(annotations: List[ImageAnnotations]):
     s3_fs.open(f'{Config.DATASET_ARTIFACTS_BUCKET}/{Config.DATASET_CACHE_FOLDER}/')
     # Store annotations in S3
@@ -20,7 +21,6 @@ def human_in_the_loop(annotations: List[ImageAnnotations]):
     pass
 
 
-@job(queue='pipelines', connection=redis)
 def run_mongo_aggregation_pipeline(pipeline, project_id):
     AnnotationsService.run_raw_annotations_pipeline(
         pipeline, page_size=None, page=None, project_id=project_id)
@@ -37,3 +37,24 @@ def webhook_call(annotations: List[ImageAnnotations], webhook: str) -> List[Imag
 @job(queue='pipelines', connection=redis)
 def data_augmentation():
     pass
+
+
+OUTPUT_NODE_OPERATIONS = {
+    NodeOperation.CVAT: (None, CVATOutputNodePayload),
+    NodeOperation.DATASET: (None, DatasetOutputNodePayload),
+    NodeOperation.WEBHOOK: (None, WebhookNodePayload),
+    NodeOperation.ANNOTATIONS: (None, dict),
+    # NodeOperation.QUERY_PIPELINE: (None, None),
+    NodeOperation.MERGE: (None, MergeNodePayload),
+    NodeOperation.REVISION: (None, None)
+}
+
+INPUT_NODE_OPERATIONS = {
+    NodeOperation.CVAT: (None, CVATInputNodePayload),
+    NodeOperation.DATASET: (None, DatasetInputNodePayload),
+    NodeOperation.WEBHOOK: (None, WebhookNodePayload),
+    NodeOperation.ANNOTATIONS: (None, dict),
+    NodeOperation.QUERY_PIPELINE: (None, QueryPipelinePost),
+    # NodeOperation.MERGE: (None, MergeNodePayload),
+    NodeOperation.REVISION: (None, None)
+}

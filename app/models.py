@@ -223,8 +223,7 @@ class RunStatus(enum.Enum):
 
 
 class Node(EmbeddedModel):
-    input_node_index: int
-    output_node_index: int
+    input_nodes: List[int]
     type: NodeType
     operation: NodeOperation
     payload: dict
