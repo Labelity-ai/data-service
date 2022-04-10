@@ -169,7 +169,7 @@ class Image(Model):
     width: int
     height: int
 
-    #created_time: datetime
+    # created_time: datetime
 
     Config = ModelConfig
 
@@ -194,6 +194,13 @@ class QueryExpression(BaseModel):
     Config = ModelConfig
 
 
+class MergeType(enum.Enum):
+    LEFT_APPEND = 'left'  # Left keys, append annotations
+    RIGHT_APPEND = 'right'  # Left keys, append annotations
+    OUTER_APPEND = 'outer'  # Both keys, append annotations when match
+    CUSTOM_WEBHOOK = 'custom_webhook'  # Custom logic implemented via webhook
+
+
 class NodeOperation(enum.Enum):
     ANNOTATIONS = 'annotations'
     QUERY_PIPELINE = 'query_pipeline'
@@ -201,6 +208,7 @@ class NodeOperation(enum.Enum):
     DATASET = 'dataset'
     REVISION = 'revision'
     CVAT = 'cvat'
+    MERGE = 'merge'
 
 
 class NodeType(enum.Enum):

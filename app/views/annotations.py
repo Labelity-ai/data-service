@@ -43,7 +43,10 @@ class AnnotationsView:
     async def run_annotations_pipeline(self, query: QueryPipelinePost,
                                        page: int = 0, page_size: int = 10) -> AnnotationsQueryResult:
         return await AnnotationsService.run_annotations_pipeline(
-            query=query, page_size=int(page_size), page=int(page), project=self.project)
+            query=query.steps,
+            page_size=int(page_size),
+            page=int(page),
+            project=self.project)
 
     @router.post("/annotations")
     async def add_annotations(self, annotation: ImageAnnotationsPostSchema,

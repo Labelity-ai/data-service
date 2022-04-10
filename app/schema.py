@@ -2,14 +2,14 @@ from typing import List, Optional, Dict, Any, Union, Tuple
 from enum import Enum
 from datetime import datetime
 from functools import partial
-from pydantic import BaseModel, validator, root_validator
+from pydantic import BaseModel, validator, root_validator, AnyHttpUrl
 from fastapi_utils.camelcase import snake2camel
 
 from app.core.query_engine.stages import QueryStage
 from app.utils import json_dumps, json_loads
 from app.models import ObjectId, Label, check_relative_points,\
     Tag, Detection, Keypoints, Polygon, Polyline, Caption, ImageAnnotations, RunStatus,\
-    Revision, RevisionChange, NodeOperation, NodeType, Node
+    Revision, RevisionChange, NodeOperation, NodeType, Node, MergeType
 
 
 class SchemaBase(BaseModel):
@@ -163,7 +163,7 @@ class ImageData(SchemaBase):
 
 
 class WebhookNodePayload(SchemaBase):
-    url: str
+    url: AnyHttpUrl
     fields: List[str]
 
     @validator('fields')
@@ -200,6 +200,21 @@ class CVATInputNodePayload(SchemaBase):
     labels_mapping: Dict[str, str] = {}
 
 
+class MergeWebhookNodePayload(SchemaBase):
+    url: AnyHttpUrl
+
+
+class MergeNodePayload(SchemaBase):
+    merge_type: MergeType
+    parameters: dict
+
+    @root_validator
+    def validate_root(cls, values):
+        if values['merge_type'] == MergeType.CUSTOM_WEBHOOK:
+            MergeWebhookNodePayload(**values['parameters'])
+        return values
+
+
 class NodeData(Node):
     @root_validator
     def validate_root(cls, values):
@@ -223,6 +238,8 @@ class NodeData(Node):
                 CVATOutputNodePayload(**payload)
         elif operation == NodeOperation.REVISION:
             PostRevision(**payload)
+        elif operation == NodeOperation.MERGE:
+            MergeNodePayload(**payload)
         elif operation == NodeOperation.ANNOTATIONS:
             # Payload will not be used for this case
             values['payload'] = {}
