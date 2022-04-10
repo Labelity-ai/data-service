@@ -68,7 +68,7 @@ class DatasetsViewBase:
 
     @staticmethod
     async def get_dataset_download_url(job_id: str) -> APIMessage:
-        url = DatasetService.get_dataset_download_url(job_id)
+        url = await DatasetService.get_dataset_download_url(job_id)
         return APIMessage(detail=url)
 
     @staticmethod

@@ -232,7 +232,7 @@ class DatasetService:
     @staticmethod
     async def get_dataset_download_url(job_id: str) -> Optional[str]:
         try:
-            job = Job.fetch(job_id)
+            job = Job.fetch(job_id, connection=redis)
             key = job.result
             if not key:
                 return None
@@ -242,8 +242,6 @@ class DatasetService:
 
     @staticmethod
     async def download_dataset(dataset: Dataset, format: DatasetExportFormat) -> DatasetExportingStatus:
-        annotations = await DatasetService._get_dataset_snapshot(dataset)
-        dataset = create_datumaro_dataset(annotations)
         dataset_binary = cloudpickle.dumps(dataset)
         job = _create_dataset_zip.delay(dataset_binary=dataset_binary, format=format)
         return job.id
