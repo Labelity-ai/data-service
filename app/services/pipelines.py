@@ -14,6 +14,9 @@ from app.models import Project
 from app.config import Config
 
 
+session = aioboto3.Session()
+
+
 def generate_pipeline_run_logs_s3_key(project: Project, run: PipelineRun):
     return f'{Config.PIPELINES_LOGS_FOLDER}/{project.id}/{run.pipeline_id}/{run.id}'
 
@@ -123,7 +126,7 @@ class PipelinesService:
 
     @staticmethod
     async def get_pipeline_run_logs(run: PipelineRun, project: Project) -> str:
-        async with aioboto3.client("s3") as s3_client:
+        async with session.client("s3") as s3_client:
             key = generate_pipeline_run_logs_s3_key(project, run)
             data = s3_client.get_object(Bucket=Config.PIPELINES_LOGS_BUCKET, Key=key)
             contents = data['Body'].read()

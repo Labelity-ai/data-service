@@ -164,9 +164,9 @@ class ImageData(SchemaBase):
 
 class WebhookNodePayload(SchemaBase):
     url: AnyHttpUrl
-    fields: List[str]
+    exported_fields: List[str]
 
-    @validator('fields')
+    @validator('exported_fields')
     def fields_should_exit(cls, value):
         for field in value:
             if field not in ImageAnnotationsData.__fields__:

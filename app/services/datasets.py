@@ -54,7 +54,7 @@ def _get_dataset_snapshot_key(dataset: Dataset):
 
 
 @job('dataset', connection=redis)
-def _create_dataset_zip(dataset: Dataset, format: DatasetExportFormat):
+async def _create_dataset_zip(dataset: Dataset, format: DatasetExportFormat):
     annotations = await DatasetService._get_dataset_snapshot(dataset)
     dataset_datumaro = create_datumaro_dataset(annotations)
     zip_name = _get_dataset_exporting_zip_name(dataset, format)
