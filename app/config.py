@@ -31,3 +31,4 @@ class Config:
     FAST_TOKEN_JWT_ALGORITHM = "HS256"
     PIPELINES_LOGS_BUCKET = os.environ.get('PIPELINES_LOGS_BUCKET' 'labelity-use-dev-logs')
     PIPELINES_LOGS_FOLDER = os.environ.get('PIPELINES_LOGS_BUCKET' 'pipelines')
+    REDIS_URI = os.environ['REDIS_URI']

@@ -61,11 +61,9 @@ class DatasetsViewBase:
         return await DatasetService.create_access_token(dataset)
 
     @staticmethod
-    async def download_dataset(id: ObjectId, project_id: ObjectId,
-                               format: DatasetExportFormat, response: Response) -> JobId:
+    async def download_dataset(id: ObjectId, project_id: ObjectId, format: DatasetExportFormat) -> JobId:
         dataset = await DatasetService.get_dataset_by_id(id, project_id)
         job_id = await DatasetService.download_dataset(dataset, format)
-        response.status_code = 202
         return JobId(job_id=job_id)
 
     @staticmethod
@@ -121,16 +119,16 @@ class DatasetsView:
         dataset = await self.get_dataset_by_id(id)
         return await DatasetService.create_access_token(dataset)
 
-    @router.get("/dataset/{id}/download")
-    async def download_dataset(self, id: ObjectId, format: DatasetExportFormat, response: Response) -> JobId:
-        return await DatasetsViewBase.download_dataset(id, self.project.id, format, response)
+    @router.get("/dataset/{id}/download", status_code=202)
+    async def download_dataset(self, id: ObjectId, format: DatasetExportFormat) -> JobId:
+        return await DatasetsViewBase.download_dataset(id, self.project.id, format)
 
     @router.get("/dataset/{id}/download_url")
-    async def download_dataset(self, job_id: str) -> APIMessage:
+    async def get_download_dataset_url(self, job_id: str) -> APIMessage:
         return await DatasetsViewBase.get_dataset_download_url(job_id)
 
     @router.get("/dataset/{id}/revisions")
-    async def download_dataset(self, id: ObjectId) -> List[Dataset]:
+    async def get_dataset_revisions(self, id: ObjectId) -> List[Dataset]:
         dataset = await self.get_dataset_by_id(id)
         return await DatasetService.get_dataset_revisions(dataset)
 

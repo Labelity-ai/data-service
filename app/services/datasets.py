@@ -7,6 +7,7 @@ import tempfile
 from fastapi import HTTPException
 from odmantic import ObjectId
 from zipfile import ZipFile, ZIP_DEFLATED
+import cloudpickle
 
 import s3fs
 from datumaro.components.dataset import DatasetItem
@@ -54,7 +55,8 @@ def _get_dataset_snapshot_key(dataset: Dataset):
 
 
 @job('dataset', connection=redis)
-async def _create_dataset_zip(dataset: Dataset, format: DatasetExportFormat):
+async def _create_dataset_zip(dataset_binary: bytes, format: DatasetExportFormat):
+    dataset: Dataset = cloudpickle.loads(dataset_binary)
     annotations = await DatasetService._get_dataset_snapshot(dataset)
     dataset_datumaro = create_datumaro_dataset(annotations)
     zip_name = _get_dataset_exporting_zip_name(dataset, format)
@@ -242,7 +244,8 @@ class DatasetService:
     async def download_dataset(dataset: Dataset, format: DatasetExportFormat) -> DatasetExportingStatus:
         annotations = await DatasetService._get_dataset_snapshot(dataset)
         dataset = create_datumaro_dataset(annotations)
-        job = _create_dataset_zip.delay(dataset=dataset, format=format)
+        dataset_binary = cloudpickle.dumps(dataset)
+        job = _create_dataset_zip.delay(dataset_binary=dataset_binary, format=format)
         return job.id
 
     @staticmethod
