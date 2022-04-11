@@ -20,22 +20,22 @@ def generate_pipeline_run_logs_s3_key(project: Project, run: PipelineRun):
     return f'{Config.PIPELINES_LOGS_FOLDER}/{project.id}/{run.pipeline_id}/{run.id}'
 
 
-async def execute_node(node: Node, inputs: list):
+async def execute_node(node: Node, inputs: list, project: Project):
     if node.type == NodeType.INPUT:
         operation, schema_class = INPUT_NODE_OPERATIONS[node.type]
     else:
         operation, schema_class = OUTPUT_NODE_OPERATIONS[node.type]
     parameters = schema_class(**node.payload)
-    return await operation(parameters, *inputs)
+    return await operation(parameters, *inputs, project=project)
 
 
 @job(queue='pipelines', connection=redis)
-async def _run_pipeline(pipeline_id: ObjectId, nodes: List[Node]):
+async def _run_pipeline(pipeline_id: ObjectId, nodes: List[Node], project: Project):
     outputs = []
 
     for i, node in enumerate(nodes):
         inputs = [outputs[x] for x in node.input_nodes]
-        results = execute_node(node, inputs)
+        results = execute_node(node, inputs, project)
         outputs[i] = results
 
     run = await engine.find_one(PipelineRun, PipelineRun.pipeline_id == pipeline_id)
@@ -127,10 +127,10 @@ class PipelinesService:
         return await engine.save(pipeline)
 
     @staticmethod
-    async def run_pipeline(pipeline: Pipeline) -> PipelineRun:
+    async def run_pipeline(pipeline: Pipeline, project: Project) -> PipelineRun:
         nodes = _check_graph_correctness(pipeline)
         nodes = _merge_consecutive_query_pipeline_nodes(nodes)
-        job = _run_pipeline.delay(pipeline.id, nodes)
+        job = _run_pipeline.delay(pipeline.id, nodes, project)
 
         run = PipelineRun(
             pipeline_id=pipeline.id,
