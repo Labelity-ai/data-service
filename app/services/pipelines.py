@@ -6,13 +6,12 @@ import aioboto3
 from odmantic import query
 import graphlib
 
-from app.schema import PipelinePostData, PipelinePatchData
-from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, RunStatus, NodeType
+from app.schema import PipelinePostData, PipelinePatchData, QueryPipelinePost
+from app.models import Pipeline, ObjectId, PipelineRun, engine, Node, RunStatus, NodeType, NodeOperation
 from app.core.queue import redis
 from app.core.pipeline_operations import INPUT_NODE_OPERATIONS, OUTPUT_NODE_OPERATIONS
 from app.models import Project
 from app.config import Config
-
 
 session = aioboto3.Session()
 
@@ -44,14 +43,47 @@ async def _run_pipeline(pipeline_id: ObjectId, nodes: List[Node]):
     await engine.save(run)
 
 
-def check_graph_correctness_and_optimize(pipeline: Pipeline) -> List[Node]:
+def _check_graph_task_ordering(nodes: List[Node]):
+    output_nodes = [i for i, n in enumerate(nodes) if n.type == NodeType.OUTPUT]
+    found_non_query_node = False
+
+    for i, node in enumerate(nodes):
+        if found_non_query_node and node.operation == NodeOperation.QUERY_PIPELINE:
+            raise HTTPException(400, f'QueryPipeline nodes should be executed before any other node')
+
+        if node.operation != NodeOperation.QUERY_PIPELINE:
+            found_non_query_node = True
+
+        if any(j in output_nodes for j in node.input_nodes):
+            raise HTTPException(400, f'Node {i} depends on an output node')
+
+
+def _merge_consecutive_query_pipeline_nodes(nodes: List[Node]) -> List[Node]:
+    query_nodes = [n for n in nodes if n.operation == NodeOperation.QUERY_PIPELINE]
+    non_query_nodes = [n for n in nodes if n.operation != NodeOperation.QUERY_PIPELINE]
+    steps = []
+
+    for node in query_nodes:
+        payload = QueryPipelinePost(**node.payload)
+        steps.extend(payload.steps)
+
+    merged_node = Node(
+        input_nodes=[],
+        type=NodeType.INPUT,
+        operation=NodeOperation.QUERY_PIPELINE,
+        payload=QueryPipelinePost(steps=steps).dict(),
+    )
+
+    return [merged_node] + non_query_nodes
+
+
+def _check_graph_correctness(pipeline: Pipeline) -> List[Node]:
     try:
         graph = {i: set(node.input_nodes) for i, node in enumerate(pipeline.nodes)}
         sorter = graphlib.TopologicalSorter(graph)
         order = sorter.static_order()
         nodes = [pipeline.nodes[i] for i in order]
-        # TODO: Merge consecutive query pipelines
-        # TODO: Check graph consistency (query pipeline before custom/output/merger and nothing depends on output node)
+        _check_graph_task_ordering(nodes)
         return nodes
     except graphlib.CycleError as error:
         raise HTTPException(400, f'Pipeline contains cycles. Detail: {error}')
@@ -61,7 +93,7 @@ class PipelinesService:
     @staticmethod
     async def create_pipeline(pipeline: PipelinePostData, project: Project) -> Pipeline:
         pipeline_instance = Pipeline(**pipeline.dict(), project_id=project.id, prefect_flow_id='')
-        check_graph_correctness_and_optimize(pipeline_instance)
+        _check_graph_correctness(pipeline_instance)
         pipeline_instance = await engine.save(pipeline_instance)
         return await engine.save(pipeline_instance)
 
@@ -91,12 +123,15 @@ class PipelinesService:
             pipeline.description = data.description
         if data.tags is not None:
             pipeline.tags = data.tags
-        check_graph_correctness_and_optimize(pipeline)
+        _check_graph_correctness(pipeline)
         return await engine.save(pipeline)
 
     @staticmethod
     async def run_pipeline(pipeline: Pipeline) -> PipelineRun:
-        job = await _run_pipeline(pipeline)
+        nodes = _check_graph_correctness(pipeline)
+        nodes = _merge_consecutive_query_pipeline_nodes(nodes)
+        job = _run_pipeline.delay(pipeline.id, nodes)
+
         run = PipelineRun(
             pipeline_id=pipeline.id,
             job_id=job.id,
@@ -105,8 +140,6 @@ class PipelinesService:
             finished_at=None,
             scheduled_by=None
         )
-        nodes = check_graph_correctness_and_optimize(pipeline)
-        _run_pipeline.delay(pipeline.id, nodes)
         return await engine.save(run)
 
     @staticmethod

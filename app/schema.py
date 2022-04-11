@@ -200,13 +200,13 @@ class CVATInputNodePayload(SchemaBase):
     labels_mapping: Dict[str, str] = {}
 
 
-class MergeWebhookNodePayload(SchemaBase):
-    url: AnyHttpUrl
+class MergeWebhookNodePayload(WebhookNodePayload):
+    pass
 
 
 class MergeNodePayload(SchemaBase):
     merge_type: MergeType
-    parameters: dict
+    parameters: dict = {}
 
     @root_validator
     def validate_root(cls, values):
@@ -222,6 +222,7 @@ class NodeData(Node):
         operation = values['operation']
         node_type = values['type']
 
+        # TODO: Verify supported NodeType & NodeOperation
         if operation == NodeOperation.QUERY_PIPELINE:
             QueryPipelinePost(**payload)
         elif operation == NodeOperation.WEBHOOK:

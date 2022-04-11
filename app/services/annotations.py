@@ -94,8 +94,8 @@ class AnnotationsService:
 
     @staticmethod
     async def run_annotations_pipeline(query: List[QueryStage],
-                                       page_size: int,
-                                       page: int,
+                                       page_size: Optional[int],
+                                       page: Optional[int],
                                        project: Project) -> AnnotationsQueryResult:
         pipeline = []
 
