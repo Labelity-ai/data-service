@@ -10,12 +10,14 @@ from app.models import Project, Revision, User, RevisionChange, RevisionComment
 from app.security import get_project, get_current_active_user
 from app.services.revisions import RevisionsService
 from app.services.users import UsersService
+from app.core.tracing import traced
 
 router = InferringRouter(
     tags=["revisions"],
 )
 
 
+@traced
 @cbv(router)
 class RevisionsView:
     project: Project = Depends(get_project)

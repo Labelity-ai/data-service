@@ -4,7 +4,6 @@ import enum
 from collections import defaultdict
 from datetime import datetime
 
-from app.core.query_engine.stages import QueryStage
 from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import DESCENDING
@@ -204,7 +203,7 @@ class RunStatus(enum.Enum):
 class Pipeline(Model):
     name: str
     project_id: ObjectId
-    nodes: List[QueryStage]
+    nodes: List['QueryStage']
     description: str = ''
     tags: List[str] = []
     deleted: bool = False

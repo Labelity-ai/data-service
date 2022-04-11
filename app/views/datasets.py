@@ -11,12 +11,14 @@ from app.schema import DatasetPostSchema, DatasetGetSortQuery, \
 from app.models import Dataset, Label, Project, FastToken
 from app.security import get_project, get_dataset_token
 from app.services.datasets import DatasetService, DatasetExportFormat
+from app.core.tracing import traced
 
 router = InferringRouter(
     tags=["datasets"],
 )
 
 
+@traced
 class DatasetsViewBase:
     @staticmethod
     async def get_dataset_by_id(id: ObjectId, project_id) -> Dataset:
@@ -77,6 +79,7 @@ class DatasetsViewBase:
 
 
 @cbv(router)
+@traced
 class DatasetsView:
     project: Project = Depends(get_project)
 
@@ -138,6 +141,7 @@ class DatasetsView:
 
 
 @cbv(router)
+@traced
 class DatasetsSharedView:
     dataset_token: FastToken = Depends(get_dataset_token)
 

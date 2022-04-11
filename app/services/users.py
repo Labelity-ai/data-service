@@ -3,8 +3,10 @@ from fastapi import HTTPException
 from odmantic import ObjectId
 
 from app.models import User, engine
+from app.core.tracing import traced
 
 
+@traced
 class UsersService:
     @staticmethod
     async def find_users_by_id(ids: List[ObjectId]) -> List[User]:

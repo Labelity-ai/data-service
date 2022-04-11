@@ -1,8 +1,13 @@
 import os
+from enum import Enum
 from dotenv import load_dotenv
 
-
 load_dotenv()
+
+
+class TracingSampler(Enum):
+    ALWAYS = 'always'
+    PROBABILISTIC = 'probabilistic'
 
 
 class Config:
@@ -33,3 +38,5 @@ class Config:
     PIPELINES_LOGS_FOLDER = os.environ.get('PIPELINES_LOGS_BUCKET' 'pipelines')
     PIPELINES_RESULTS_FOLDER = os.environ.get('PIPELINES_RESULTS_FOLDER' 'results')
     REDIS_URI = os.environ['REDIS_URI']
+
+    TRACING_SAMPLER: TracingSampler = TracingSampler.ALWAYS

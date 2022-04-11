@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.views.annotations import router as annotations_router
 from app.views.projects import router as projects_router
@@ -29,6 +30,17 @@ app.include_router(projects_router)
 app.include_router(datasets_router)
 app.include_router(storage_router)
 app.include_router(revisions_router)
+
+prometheus_instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=[".*admin.*", "/metrics"],
+    env_var_name="ENABLE_METRICS",
+)
+
+prometheus_instrumentator.instrument(app).expose(app)
 
 
 @app.on_event("startup")

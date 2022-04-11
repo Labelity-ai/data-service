@@ -26,6 +26,7 @@ from app.security import create_fast_jwt_token
 from app.config import Config
 from app.utils import zip_dir
 from app.core.queue import redis
+from app.core.tracing import traced
 
 
 s3_fs = s3fs.S3FileSystem()
@@ -87,6 +88,7 @@ async def _create_dataset_zip(dataset_binary: bytes, format: DatasetExportFormat
         return output_key
 
 
+@traced
 class DatasetService:
     @staticmethod
     async def get_dataset_by_id(dataset_id: ObjectId, project_id: ObjectId) -> Dataset:

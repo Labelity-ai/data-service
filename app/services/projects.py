@@ -7,8 +7,10 @@ from odmantic import ObjectId
 from app.schema import ProjectPostSchema, ApiKey
 from app.models import engine, Project, ImageAnnotations, Label
 from app.core.aggregations import GET_LABELS_PIPELINE, GET_IMAGE_ATTRIBUTES_PIPELINE
+from app.core.tracing import traced
 
 
+@traced
 class ProjectService:
     @staticmethod
     async def get_project_by_id(project_id: ObjectId, user_id: ObjectId) -> Project:

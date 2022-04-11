@@ -12,6 +12,7 @@ from app.core.importers import DatasetImportFormat, import_dataset
 from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline
 from app.services.projects import ProjectService
 from app.services.storage import StorageService
+from app.core.tracing import traced
 
 
 def _add_group_to_annotations(annotations: List[Union[PredictionPostData, CaptionPostData]], group: str):
@@ -35,6 +36,7 @@ class AnnotationSortDirection(str, Enum):
     DESCENDING = 'descending'
 
 
+@traced
 class AnnotationsService:
     @staticmethod
     async def get_annotations_by_event_id(event_id: str, project_id: ObjectId) -> ImageAnnotations:

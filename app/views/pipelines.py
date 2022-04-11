@@ -7,12 +7,14 @@ from app.schema import PipelineRunInfo, PipelinePostData, PipelinePatchData
 from app.models import Project
 from app.security import get_project
 from app.services.pipelines import PipelinesService
+from app.core.tracing import traced
 
 router = InferringRouter(
     tags=["pipeines"],
 )
 
 
+@traced
 @cbv(router)
 class PipelinesView:
     project: Project = Depends(get_project)

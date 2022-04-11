@@ -8,8 +8,10 @@ from app.models import ImageAnnotations, engine, RevisionChange, Revision, Revis
 from app.schema import PostRevision, PatchRevision, PutRevisionChange, SortDirection, RevisionGetSortQuery, \
     RevisionQueryResult, RevisionChangesQueryResult, PostRevisionChange
 from app.core.query_engine.stages import make_generic_paginated_pipeline
+from app.core.tracing import traced
 
 
+@traced
 class RevisionsService:
     @staticmethod
     async def get_revisions(project: Project,

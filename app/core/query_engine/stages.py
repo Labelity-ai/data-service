@@ -10,7 +10,7 @@ from aenum import extend_enum
 from app.core.query_engine.expressions import ViewExpression, ViewField
 from app.core.query_engine.builder import construct_view_expression
 from app.models import ObjectId, EmbeddedModel, QueryExpression, ImageAnnotations, \
-    Shape, Model, ModelConfig, Label
+    Shape, Model, ModelConfig, Label, Pipeline
 from pydantic import root_validator, create_model
 
 
@@ -797,3 +797,6 @@ class QueryPipeline(Model):
     dataset_id: Optional[ObjectId] = None
 
     Config = ModelConfig
+
+
+Pipeline.update_forward_refs(QueryStage=QueryStage)

@@ -6,10 +6,13 @@ import aioboto3
 from app.config import Config
 from app.models import ObjectId, Image, ImageAnnotations, engine
 from app.schema import ImageData
+from app.core.tracing import traced
+
 
 session = aioboto3.Session()
 
 
+@traced
 class StorageService:
     @staticmethod
     async def create_presigned_post_url_for_image(image_name: str, content_type: str, project_id: ObjectId) -> dict:

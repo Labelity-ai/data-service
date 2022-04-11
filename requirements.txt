@@ -11,12 +11,12 @@ zipp==3.4.0
 uvicorn==0.13.3
 datumaro~=0.1.6.1
 aenum~=3.0.0
-boto3~=1.16.52
+boto3~=1.21.21
 python-dotenv~=0.15.0
 s3fs~=0.4.2
 cloudpickle~=1.6.0
 
-aioboto3~=8.2.1
+aioboto3~=9.5.0
 jmespath~=0.10.0
 dnspython~=2.1.0
 idna~=2.10
@@ -25,9 +25,9 @@ future~=0.18.2
 cffi~=1.14.5
 Pillow~=8.1.0
 numpy~=1.20.1
-botocore~=1.19.52
+botocore~=1.24.21
 fsspec~=0.8.5
-s3transfer~=0.3.4
+s3transfer~=0.5.2
 aiohttp~=3.7.4.post0
 urllib3~=1.26.3
 six~=1.15.0
@@ -39,5 +39,4 @@ requests~=2.25.1
 dask~=2021.4.0
 distributed~=2021.4.0
 certifi~=2020.12.5
-
-graphlib-backport>=1.0.0
+opencensus~=0.8.0

@@ -9,10 +9,12 @@ from app.schema import ImageData
 from app.security import get_project
 from app.services.storage import StorageService
 from app.config import Config
+from app.core.tracing import traced
 
 router = InferringRouter(tags=["storage"])
 
 
+@traced
 @cbv(router)
 class StorageView:
     project: Project = Depends(get_project)

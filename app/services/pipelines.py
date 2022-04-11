@@ -12,6 +12,7 @@ from app.services.annotations import AnnotationsService
 from app.core.queue import redis
 from app.models import Project
 from app.config import Config
+from app.core.tracing import traced
 
 session = aioboto3.Session()
 
@@ -39,6 +40,7 @@ async def _run_pipeline(pipeline: Pipeline, project: Project):
             Key=generate_pipeline_run_results_s3_key(project, run))
 
 
+@traced
 class PipelinesService:
     @staticmethod
     async def create_pipeline(pipeline: PipelinePostData, project: Project) -> Pipeline:
