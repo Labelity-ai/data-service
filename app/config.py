@@ -29,6 +29,7 @@ class Config:
     VIDEO_FPS_LIMIT = int(os.environ.get('VIDEO_FPS_LIMIT', 5))
     JWT_ALGORITHM = "HS512"
     FAST_TOKEN_JWT_ALGORITHM = "HS256"
-    PIPELINES_LOGS_BUCKET = os.environ.get('PIPELINES_LOGS_BUCKET' 'labelity-use-dev-logs')
+    PIPELINES_BUCKET = os.environ.get('PIPELINES_BUCKET' 'labelity-use-dev-pipelines')
     PIPELINES_LOGS_FOLDER = os.environ.get('PIPELINES_LOGS_BUCKET' 'pipelines')
+    PIPELINES_RESULTS_FOLDER = os.environ.get('PIPELINES_RESULTS_FOLDER' 'results')
     REDIS_URI = os.environ['REDIS_URI']

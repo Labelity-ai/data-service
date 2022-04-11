@@ -4,6 +4,7 @@ import enum
 from collections import defaultdict
 from datetime import datetime
 
+from app.core.query_engine.stages import QueryStage
 from odmantic import Model, ObjectId, EmbeddedModel, AIOEngine
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import DESCENDING
@@ -194,45 +195,16 @@ class QueryExpression(BaseModel):
     Config = ModelConfig
 
 
-class MergeType(enum.Enum):
-    LEFT_APPEND = 'left'  # Left keys, append annotations
-    RIGHT_APPEND = 'right'  # Left keys, append annotations
-    OUTER_APPEND = 'outer'  # Both keys, append annotations when match
-    CUSTOM_WEBHOOK = 'custom_webhook'  # Custom logic implemented via webhook
-
-
-class NodeOperation(enum.Enum):
-    ANNOTATIONS = 'annotations'
-    QUERY_PIPELINE = 'query_pipeline'
-    WEBHOOK = 'webhook'
-    DATASET = 'dataset'
-    REVISION = 'revision'
-    CVAT = 'cvat'
-    MERGE = 'merge'
-
-
-class NodeType(enum.Enum):
-    INPUT = 'input'
-    OUTPUT = 'output'
-
-
 class RunStatus(enum.Enum):
     SUCCESS = 'success'
     IN_PROGRESS = 'in_progress'
     FAILED = 'failed'
 
 
-class Node(EmbeddedModel):
-    input_nodes: List[int]
-    type: NodeType
-    operation: NodeOperation
-    payload: dict
-
-
 class Pipeline(Model):
     name: str
     project_id: ObjectId
-    nodes: List[Node]
+    nodes: List[QueryStage]
     description: str = ''
     tags: List[str] = []
     deleted: bool = False

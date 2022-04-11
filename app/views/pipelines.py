@@ -52,7 +52,7 @@ class PipelinesView:
     @router.post("/pipeline/{id}/runs")
     async def run_pipeline(self, id) -> PipelineRunInfo:
         pipeline = await self.get_pipeline(id)
-        run = await PipelinesService.run_pipeline(pipeline)
+        run = await PipelinesService.run_pipeline(pipeline, self.project)
         return PipelineRunInfo(*run.dict(exclude=['job_id']))
 
     @router.get("/pipeline/runs/{id}/logs")
