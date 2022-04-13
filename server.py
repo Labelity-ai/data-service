@@ -8,6 +8,7 @@ from app.views.projects import router as projects_router
 from app.views.datasets import router as datasets_router
 from app.views.storage import router as storage_router
 from app.views.revisions import router as revisions_router
+from app.core.logger import RouteLoggerMiddleware
 
 app = FastAPI(title='Labelity.ai API Service', default_response_class=ORJSONResponse)
 
@@ -41,6 +42,8 @@ prometheus_instrumentator = Instrumentator(
 )
 
 prometheus_instrumentator.instrument(app).expose(app)
+
+app.add_middleware(RouteLoggerMiddleware)
 
 
 @app.on_event("startup")
