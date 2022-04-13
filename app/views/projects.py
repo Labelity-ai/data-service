@@ -30,19 +30,19 @@ class ProjectsView:
 
     @router.get("/project/{id}")
     async def get_project_by_id(self, id: ObjectId) -> Project:
-        return await ProjectService.get_project_by_id(id, self.user.id)
+        return await ProjectService.get_project_by_id(id)
 
     @router.get("/project")
     async def get_projects(self) -> List[Project]:
-        return await ProjectService.get_projects(self.user.id)
+        return await ProjectService.get_projects()
 
     @router.post("/project")
     async def add_project(self, project: ProjectPostSchema) -> Project:
-        return await ProjectService.add_project(project, self.user.id)
+        return await ProjectService.add_project(project)
 
     @router.post("/project/{id}/api_key")
     async def add_api_key(self, id) -> ApiKey:
-        return await ProjectService.add_api_key(id, self.user.id)
+        return await ProjectService.add_api_key(id)
 
     @router.put("/project/{id}")
     async def update_project(self, id: ObjectId, project: ProjectPostSchema) -> Project:
@@ -50,7 +50,7 @@ class ProjectsView:
 
     @router.delete("/project/{id}")
     async def delete_project(self, id: ObjectId) -> APIMessage:
-        await ProjectService.delete_project(id, self.user.id)
+        await ProjectService.delete_project(id)
         return APIMessage(detail=f"Deleted project {id}")
 
     @router.get("/project/{id}/labels")

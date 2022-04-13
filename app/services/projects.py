@@ -13,8 +13,8 @@ from app.core.tracing import traced
 @traced
 class ProjectService:
     @staticmethod
-    async def get_project_by_id(project_id: ObjectId, user_id: ObjectId) -> Project:
-        project = await engine.find_one(Project, (Project.id == project_id) & (Project.user_id == user_id))
+    async def get_project_by_id(project_id: ObjectId) -> Project:
+        project = await engine.find_one(Project, (Project.id == project_id))
 
         if project is None:
             raise HTTPException(404)
@@ -22,12 +22,12 @@ class ProjectService:
         return project
 
     @staticmethod
-    async def get_projects(user_id: ObjectId) -> List[Project]:
-        return await engine.find(Project, Project.user_id == user_id)
+    async def get_projects() -> List[Project]:
+        return await engine.find(Project)
 
     @staticmethod
-    async def add_project(project: ProjectPostSchema, user_id: ObjectId) -> Project:
-        instance = Project(**project.dict(), user_id=user_id)
+    async def add_project(project: ProjectPostSchema) -> Project:
+        instance = Project(**project.dict())
         return await engine.save(instance)
 
     @staticmethod
@@ -36,13 +36,13 @@ class ProjectService:
         return await engine.save(instance)
 
     @staticmethod
-    async def delete_project(project_id: ObjectId, user_id: ObjectId):
-        project = await ProjectService.get_project_by_id(project_id, user_id)
+    async def delete_project(project_id: ObjectId):
+        project = await ProjectService.get_project_by_id(project_id)
         await engine.delete(project)
 
     @staticmethod
-    async def add_api_key(project_id: ObjectId, user_id: ObjectId) -> ApiKey:
-        project = await ProjectService.get_project_by_id(project_id, user_id)
+    async def add_api_key(project_id: ObjectId) -> ApiKey:
+        project = await ProjectService.get_project_by_id(project_id)
         api_key = secrets.token_urlsafe(20)
         # TODO: Check if api key is unique. Is it necessary?
         project.api_keys.extend(api_key)

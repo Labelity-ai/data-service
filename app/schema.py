@@ -20,6 +20,13 @@ class SchemaBase(BaseModel):
         alias_generator = partial(snake2camel, start_lower=True)
 
 
+class UserInfo(SchemaBase):
+    name: str
+    email: str
+    verified: bool
+    image: str
+
+
 class PredictionPostData(SchemaBase):
     label: str
     score: Optional[float] = None

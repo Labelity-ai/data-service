@@ -146,6 +146,7 @@ class User(Model):
     image: str
     created_at: datetime
     updated_at: datetime
+    role: UserRoleType
 
     Config = ModelConfig
 
@@ -154,10 +155,18 @@ class TestUser(Model):
     pass
 
 
+class UserRoleType(enum.Enum):
+    ADMIN = 'admin'
+    MANAGER = 'manager'
+    VIEWER = 'viewer'
+    DEVELOPER = 'developer'
+    REVIEWER = 'reviewer'
+    ANNOTATOR = 'annotator'
+
+
 class Project(Model):
     name: str
     description: str
-    user_id: ObjectId
     api_keys: List[str] = []
 
     Config = ModelConfig
