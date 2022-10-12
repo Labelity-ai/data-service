@@ -4,7 +4,7 @@ from datetime import datetime
 from odmantic import ObjectId
 from pymongo import ASCENDING, DESCENDING
 
-from app.models import ImageAnnotations, engine, RevisionChange, Revision, RevisionComment, Project, User
+from app.models import ImageAnnotations, get_engine, RevisionChange, Revision, RevisionComment, Project, User
 from app.schema import PostRevision, PatchRevision, PutRevisionChange, SortDirection, RevisionGetSortQuery, \
     RevisionQueryResult, RevisionChangesQueryResult, PostRevisionChange
 from app.core.query_engine.stages import make_generic_paginated_pipeline
@@ -27,6 +27,7 @@ class RevisionsService:
         ]
 
         pipeline = make_generic_paginated_pipeline(pipeline, page_size, page)
+        engine = await get_engine()
         collection = engine.get_collection(ImageAnnotations)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
 
@@ -37,6 +38,7 @@ class RevisionsService:
 
     @staticmethod
     async def get_revision(revision_id: ObjectId, project: Project) -> Revision:
+        engine = await get_engine()
         revision = await engine.find_one(
             Revision,
             (Revision.id == revision_id) & (Revision.project_id == project.id))
@@ -53,6 +55,7 @@ class RevisionsService:
                             project_id=project.id,
                             description=description,
                             assignees=[u.id for u in assignees])
+        engine = await get_engine()
         return await engine.save(instance)
 
     @staticmethod
@@ -62,10 +65,12 @@ class RevisionsService:
         if description is not None:
             revision.description = description
         revision.updated_at = datetime.now()
+        engine = await get_engine()
         return await engine.save(revision)
 
     @staticmethod
     async def delete_revision(revision: Revision) -> None:
+        engine = await get_engine()
         await engine.delete(revision)
 
     @staticmethod
@@ -74,6 +79,7 @@ class RevisionsService:
                                     page: int = None) -> RevisionChangesQueryResult:
         pipeline = [{'$match': {'revision_id': revision.id}}]
         pipeline = make_generic_paginated_pipeline(pipeline, page_size, page)
+        engine = await get_engine()
         collection = engine.get_collection(ImageAnnotations)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
 
@@ -84,6 +90,7 @@ class RevisionsService:
 
     @staticmethod
     async def get_revision_change(revision_change_id: ObjectId) -> RevisionChange:
+        engine = await get_engine()
         revision = await engine.find_one(RevisionChange, (RevisionChange.id == revision_change_id))
 
         if revision is None:
@@ -100,15 +107,19 @@ class RevisionsService:
             tags=change.tags,
             created_date=datetime.now()
         )
+        engine = await get_engine()
         return await engine.save(instance)
 
     @staticmethod
     async def update_revision_change(change: RevisionChange, new_data: PutRevisionChange) -> RevisionChange:
         change.tags = new_data.tags
+        engine = await get_engine()
         return await engine.save(change)
 
     @staticmethod
     async def delete_revision_change(change: RevisionChange, delete_comments: bool = True):
+        engine = await get_engine()
+
         if delete_comments:
             comments = await engine.find(RevisionComment, RevisionComment.revision_change_id == change.id)
             comment_ids = [comment.id for comment in comments]
@@ -125,10 +136,12 @@ class RevisionsService:
             created_date=datetime.now(),
             edited_date=None
         )
+        engine = await get_engine()
         return await engine.save(comment)
 
     @staticmethod
     async def edit_revision_comment(comment_id: ObjectId, content: str) -> RevisionComment:
+        engine = await get_engine()
         comment = await engine.find_one(RevisionComment, RevisionComment.id == comment_id)
 
         if comment is None:
@@ -140,6 +153,7 @@ class RevisionsService:
 
     @staticmethod
     async def delete_revision_comment(comment_id: ObjectId):
+        engine = await get_engine()
         comment = await engine.find_one(RevisionComment, RevisionComment.id == comment_id)
 
         if comment is None:

@@ -2,10 +2,16 @@ FROM python:3.7
 
 WORKDIR /app
 
+EXPOSE 5000
+
 COPY requirements.txt .
-COPY app ./app
-COPY server.py .
 
 RUN pip install -r requirements.txt
 
-CMD [ "PYTHON_PATH=. python", "./server.py" ]
+COPY app ./app
+COPY server.py .
+
+ENV PYTHONPATH .
+ENV PORT 5000
+
+CMD ["python", "server.py"]

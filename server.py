@@ -1,8 +1,12 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
+import uvicorn
 
+from app.models import initialize
 from app.views.annotations import router as annotations_router
 from app.views.projects import router as projects_router
 from app.views.datasets import router as datasets_router
@@ -48,5 +52,8 @@ app.add_middleware(RouteLoggerMiddleware)
 
 @app.on_event("startup")
 async def startup_event():
-    from app.models import initialize
     await initialize()
+
+
+if __name__ == '__main__':
+    uvicorn.run('server:app', host="0.0.0.0", port=os.environ['PORT'])

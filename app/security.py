@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from starlette import status
 
 from app.config import Config
-from app.models import User, engine, Project, ObjectId, FastToken
+from app.models import User, get_engine, Project, ObjectId, FastToken
 
 API_KEY_NAME = 'X-API-Key'
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
@@ -17,6 +17,7 @@ OAUTH2_SCHEME_OPTIONAL = OAuth2PasswordBearer(tokenUrl="token", auto_error=False
 
 
 async def _get_user(user_id: str):
+    engine = await get_engine()
     return await engine.find_one(User, User.id == user_id)
 
 
@@ -36,6 +37,7 @@ async def get_dataset_token(token: str):
     except JWTError:
         raise credentials_exception
 
+    engine = await get_engine()
     token = await engine.find_one(FastToken, FastToken.id == ObjectId(token_id))
 
     if token is None:
@@ -98,6 +100,7 @@ def create_fast_jwt_token(data: dict, expires_delta: Optional[timedelta] = None)
 async def get_project(x_api_key: str = Depends(API_KEY_HEADER),
                       user: Optional[User] = Depends(get_optional_current_user),
                       project_id: Optional[str] = Header(None)):
+    engine = await get_engine()
     return await engine.find_one(Project, Project.id == ObjectId('602a2f0deac5ef687b30ac21'))
 
     if user and project_id:

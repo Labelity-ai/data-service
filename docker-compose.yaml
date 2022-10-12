@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  localstack:
+    image: localstack/localstack
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+      - "127.0.0.1:53:53"                # DNS config (only required for Pro)
+      - "127.0.0.1:53:53/udp"            # DNS config (only required for Pro)
+      - "127.0.0.1:443:443"              # LocalStack HTTPS Gateway (only required for Pro)
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SERVICES=s3
+    volumes:
+      - localstack_storage:/var/lib/localstack
+      - "/var/run/docker.sock:/var/run/docker.sock"
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    expose:
+      - 6379
+    command: redis-server --save 20 1 --loglevel warning --requirepass 1234
+    volumes:
+      - redis_storage:/data
+  mongodb:
+    image: mongo:5.0
+    expose:
+      - 27017
+    volumes:
+      - mongo_storage:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root_user
+      - MONGO_INITDB_ROOT_PASSWORD=1234
+      - MONGO_INITDB_ROOT_DATABASE=default_db
+  service:
+    build: .
+    environment:
+      - AWS_ENDPOINT_URL==http://localhost:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - MONGO_URI=mongodb://root_user:1234@mongodb
+      - MONGO_DATABASE=default_db
+      - ENABLE_METRICS=false
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=1234
+      - REDIS_DATABASE=tasks
+      - IMAGE_STORAGE_BUCKET=images
+      - PIPELINES_BUCKET=pipelines
+      - DATASET_ARTIFACTS_BUCKET=datasets
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:5000"
+    depends_on:
+      - mongodb
+      - redis
+      - localstack
+    links:
+      - mongodb
+      - localstack
+      - redis
+
+volumes:
+  localstack_storage: {}
+  mongo_storage: {}
+  redis_storage: {}

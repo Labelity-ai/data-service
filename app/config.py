@@ -14,13 +14,14 @@ class Config:
     POST_BULK_LIMIT = int(os.environ.get('POST_BULK_LIMIT', 1000))
     MONGO_HOST = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
     MONGO_DATABASE = os.environ.get('MONGO_DATABASE', 'default_database')
-    IMAGE_STORAGE_BUCKET = os.environ.get('IMAGE_STORAGE_BUCKET', 'labelity-use-dev-images')
+    AWS_ENDPOINT_URL = os.environ.get('AWS_ENDPOINT_URL')
+    IMAGE_STORAGE_BUCKET = os.environ['IMAGE_STORAGE_BUCKET']
     RAW_IMAGES_FOLDER = os.environ.get('RAW_IMAGES_FOLDER', 'raw')
     VIDEOS_FOLDER = os.environ.get('VIDEOS_FOLDER', 'videos')
     THUMBNAILS_FOLDER = os.environ.get('THUMBNAILS_FOLDER', 'thumbnails')
     THUMBNAILS_MAX_WIDTH = int(os.environ.get('THUMBNAILS_WIDTH', '500'))
     THUMBNAILS_MAX_HEIGHT = int(os.environ.get('THUMBNAILS_MAX_HEIGHT', '500'))
-    DATASET_ARTIFACTS_BUCKET = os.environ.get('DATASET_ARTIFACTS_BUCKET', 'labelity-use-dev-artifacts')
+    DATASET_ARTIFACTS_BUCKET = os.environ['DATASET_ARTIFACTS_BUCKET']
     DATASET_EXPORTING_QUEUE_FOLDER = os.environ.get('DATASET_EXPORTING_QUEUE_FOLDER', 'datasets/queue')
     DATASET_EXPORTING_RESULTS_FOLDER = os.environ.get('DATASET_EXPORTING_RESULTS_FOLDER', 'datasets/compiled')
     DATASET_CACHE_FOLDER = os.environ.get('DATASET_CACHE_FOLDER', 'datasets/cache')
@@ -34,9 +35,11 @@ class Config:
     VIDEO_FPS_LIMIT = int(os.environ.get('VIDEO_FPS_LIMIT', 5))
     JWT_ALGORITHM = "HS512"
     FAST_TOKEN_JWT_ALGORITHM = "HS256"
-    PIPELINES_BUCKET = os.environ.get('PIPELINES_BUCKET' 'labelity-use-dev-pipelines')
-    PIPELINES_LOGS_FOLDER = os.environ.get('PIPELINES_LOGS_BUCKET' 'pipelines')
+    PIPELINES_BUCKET = os.environ['PIPELINES_BUCKET']
+    PIPELINES_LOGS_FOLDER = os.environ.get('PIPELINES_LOGS_FOLDER' 'logs')
     PIPELINES_RESULTS_FOLDER = os.environ.get('PIPELINES_RESULTS_FOLDER' 'results')
-    REDIS_URI = os.environ['REDIS_URI']
-
+    REDIS_HOST = os.environ['REDIS_HOST']
+    REDIS_PORT = os.environ['REDIS_PORT']
+    REDIS_PASSWORD = os.environ['REDIS_PASSWORD']
+    REDIS_DATABASE = os.environ['REDIS_DATABASE']
     TRACING_SAMPLER: TracingSampler = TracingSampler.ALWAYS

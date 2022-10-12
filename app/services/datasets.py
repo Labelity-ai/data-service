@@ -17,7 +17,7 @@ from rq.job import Job
 
 from app.schema import DatasetPostSchema, DatasetGetSortQuery, DatasetToken, \
     ImageAnnotationsData, DatasetPatchSchema
-from app.models import ImageAnnotations, Dataset, Label, engine, FastToken
+from app.models import ImageAnnotations, Dataset, Label, get_engine, FastToken
 from app.services.storage import StorageService
 from app.services.annotations import AnnotationsService
 from app.core.aggregations import GET_LABELS_PIPELINE
@@ -92,6 +92,7 @@ async def _create_dataset_zip(dataset_binary: bytes, format: DatasetExportFormat
 class DatasetService:
     @staticmethod
     async def get_dataset_by_id(dataset_id: ObjectId, project_id: ObjectId) -> Dataset:
+        engine = await get_engine()
         dataset = await engine.find_one(
             Dataset,
             (Dataset.id == dataset_id) & (Dataset.project_id == project_id))
@@ -106,6 +107,7 @@ class DatasetService:
 
     @staticmethod
     async def delete_dataset(dataset_id: ObjectId, project_id: ObjectId):
+        engine = await get_engine()
         dataset = await engine.find_one(
             Dataset,
             (Dataset.id == dataset_id) & (ImageAnnotations.project_id == project_id))
@@ -139,13 +141,15 @@ class DatasetService:
             created_at=now,
             project_id=project_id,
         )
-
+        engine = await get_engine()
         instance = await engine.save(instance)
         await DatasetService._create_dataset_snapshot(instance, annotations)
         return instance
 
     @staticmethod
     async def update_dataset(dataset: Dataset, new_data: Union[DatasetPatchSchema, DatasetPostSchema]) -> Dataset:
+        engine = await get_engine()
+
         annotations = await DatasetService.check_event_ids_exist(
             dataset.event_ids, dataset.project_id)
 
@@ -198,8 +202,10 @@ class DatasetService:
             }
         ]
 
+        engine = await get_engine()
         collection = engine.get_collection(Dataset)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
+
         return [Dataset.parse_doc(x) for x in result['parents']] + \
                [dataset] + \
                [Dataset.parse_doc(x) for x in result['children']]
@@ -217,6 +223,7 @@ class DatasetService:
             queries.append(Dataset.child_id == None)
 
         kwargs = {'sort': getattr(Dataset, sort.value)} if sort else {}
+        engine = await get_engine()
         return await engine.find(Dataset, *queries, **kwargs)
 
     @staticmethod
@@ -227,6 +234,7 @@ class DatasetService:
                 'event_id': {'$in': dataset.event_ids}
             }
         }] + GET_LABELS_PIPELINE
+        engine = await get_engine()
         collection = engine.get_collection(ImageAnnotations)
         labels = await collection.aggregate(labels_pipeline).to_list(length=None)
         return [Label(name=doc['name'], attributes=doc['attributes'], shape=doc['shape']) for doc in labels]
@@ -250,6 +258,7 @@ class DatasetService:
 
     @staticmethod
     async def create_access_token(dataset: Dataset, expires_delta: Optional[timedelta] = None):
+        engine = await get_engine()
         token = await engine.save(FastToken(
             creation_date=datetime.utcnow(),
             timestamp=datetime.utcnow(),

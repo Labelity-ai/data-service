@@ -26,9 +26,9 @@ class ModelConfig:
 
 
 class Prediction(EmbeddedModel):
+    id: int
     label: str
-    group: str = 'ground_truth'
-    score: Optional[float] = None
+    tags: List[int] = []
     attributes: Dict[str, Any] = {}
 
     Config = ModelConfig
@@ -95,7 +95,7 @@ class ImageAnnotations(Model):
     polylines: List[Polyline] = []
     detections: List[Detection] = []
     polygons: List[Polygon] = []
-    tags: List[Tag] = []
+    tags: List[int] = []
     captions: List[Caption] = []
     attributes: Dict[str, Any] = {}
     labels: List[Label] = []
@@ -103,7 +103,7 @@ class ImageAnnotations(Model):
     @staticmethod
     def _extract_labels(objects: List[Prediction], shape: Shape, labels: set, attributes):
         for obj in objects:
-            key = (obj.label, shape, obj.group)
+            key = (obj.label, shape)
             attributes[key].update(obj.attributes.keys())
             labels.add(key)
 
@@ -119,8 +119,8 @@ class ImageAnnotations(Model):
 
         return [Label(name=name,
                       shape=shape,
-                      attributes=list(attributes[(name, shape, group)]))
-                for name, shape, group in labels]
+                      attributes=list(attributes[(name, shape)]))
+                for name, shape in labels]
 
     Config = ModelConfig
 
@@ -141,7 +141,7 @@ class Dataset(Model):
 class User(Model):
     name: str
     email: str
-    email_verified: datetime
+    email_verified: Optional[datetime]
     is_active: bool
     image: str
     created_at: datetime
@@ -168,6 +168,7 @@ class Project(Model):
     name: str
     description: str
     api_keys: List[str] = []
+    tags: List[Tag] = []
 
     Config = ModelConfig
 
@@ -255,11 +256,20 @@ class Revision(Model):
 
 QueryExpression.update_forward_refs()
 
-client = AsyncIOMotorClient(Config.MONGO_HOST)
-engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
+client: AsyncIOMotorClient = None
+engine: AIOEngine = None
+
+
+async def get_engine() -> AIOEngine:
+    return engine
 
 
 async def initialize():
+    global client
+    global engine
+    client = AsyncIOMotorClient(Config.MONGO_HOST)
+    engine = AIOEngine(motor_client=client, database=Config.MONGO_DATABASE)
+
     await engine.get_collection(Project).create_index('user_id')
     await engine.get_collection(Dataset).create_index([
         ('project_id', DESCENDING),

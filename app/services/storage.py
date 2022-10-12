@@ -1,15 +1,12 @@
 from typing import List
 import os
 from fastapi import HTTPException
-import aioboto3
 
 from app.config import Config
-from app.models import ObjectId, Image, ImageAnnotations, engine
+from app.models import ObjectId, Image, ImageAnnotations, get_engine
 from app.schema import ImageData
 from app.core.tracing import traced
-
-
-session = aioboto3.Session()
+from app.core.s3 import get_s3_client
 
 
 @traced
@@ -18,7 +15,7 @@ class StorageService:
     async def create_presigned_post_url_for_image(image_name: str, content_type: str, project_id: ObjectId) -> dict:
         extension = content_type.split('/')[-1]
         filename = image_name if image_name.endswith(f'.{extension}') else f'{image_name}.{extension}'
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             url = await s3_client.generate_presigned_url(
                 'put_object',
                 Params={
@@ -33,7 +30,7 @@ class StorageService:
 
     @staticmethod
     async def create_presigned_multipart_upload_url_for_dataset(filename: str, project_id: ObjectId) -> dict:
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             response = await s3_client.create_multipart_upload(
                 Bucket=Config.DATASET_ARTIFACTS_BUCKET,
                 Key=f'{Config.DATASET_IMPORT_FOLDER}/{project_id}/{filename}',
@@ -50,7 +47,7 @@ class StorageService:
         video_name = os.path.splitext(video_name)[0]
         filename = f'{video_name}__{start_sec}_{end_sec}_{fps}.{extension}'
 
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             url = await s3_client.generate_presigned_url(
                 'put_object',
                 Params={
@@ -65,7 +62,7 @@ class StorageService:
 
     @staticmethod
     async def create_presigned_get_url_for_thumbnail(event_id: str, project_id: ObjectId) -> str:
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             return await s3_client.generate_presigned_url(
                 'get_object',
                 ExpiresIn=Config.SIGNED_GET_THUMBNAIL_URL_EXPIRATION,
@@ -77,7 +74,7 @@ class StorageService:
 
     @staticmethod
     async def create_presigned_get_url_for_image(event_id: str, project_id: ObjectId) -> str:
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             return await s3_client.generate_presigned_url(
                 'get_object',
                 ExpiresIn=Config.SIGNED_GET_IMAGE_URL_EXPIRATION,
@@ -89,7 +86,7 @@ class StorageService:
 
     @staticmethod
     async def create_presigned_get_url_for_object_download(key: str) -> str:
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             return await s3_client.generate_presigned_url(
                 'get_object',
                 ExpiresIn=Config.SIGNED_GET_OBJECT_URL_EXPIRATION,
@@ -102,6 +99,7 @@ class StorageService:
     @staticmethod
     async def delete_image(event_id: str, project_id: ObjectId):
         # TODO: Remove str wrapper
+        engine = await get_engine()
         image = await engine.find_one(Image, Image.project_id == str(project_id), Image.event_id == event_id)
         annotations = await engine.find_one(
             ImageAnnotations,
@@ -111,7 +109,7 @@ class StorageService:
         if not image:
             raise HTTPException(404)
 
-        async with session.client("s3") as s3_client:
+        async with get_s3_client() as s3_client:
             await s3_client.delete_object(
                 Bucket=Config.IMAGE_STORAGE_BUCKET,
                 Key=f'{Config.RAW_IMAGES_FOLDER}/{project_id}/{event_id}')
@@ -124,6 +122,8 @@ class StorageService:
 
     @staticmethod
     async def get_images(event_id: str, page: int, page_size: int, project_id: ObjectId) -> List[ImageData]:
+        engine = await get_engine()
+
         if event_id:
             image = await engine.find_one(Image, Image.project_id == project_id, Image.event_id == event_id)
             return [image] if image else []

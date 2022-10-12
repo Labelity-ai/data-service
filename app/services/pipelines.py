@@ -7,7 +7,7 @@ from odmantic import query
 import json
 
 from app.schema import PipelinePostData, PipelinePatchData
-from app.models import Pipeline, ObjectId, PipelineRun, engine, RunStatus
+from app.models import Pipeline, ObjectId, PipelineRun, get_engine, RunStatus
 from app.services.annotations import AnnotationsService
 from app.core.queue import redis
 from app.models import Project
@@ -28,6 +28,7 @@ def generate_pipeline_run_results_s3_key(project: Project, run: PipelineRun):
 @job(queue='pipelines', connection=redis)
 async def _run_pipeline(pipeline: Pipeline, project: Project):
     results = await AnnotationsService.run_annotations_pipeline(query=pipeline.nodes, project=project)
+    engine = await get_engine()
     run = await engine.find_one(PipelineRun, PipelineRun.pipeline_id == pipeline.id)
     run.finished_at = datetime.now()
     await engine.save(run)
@@ -44,12 +45,14 @@ async def _run_pipeline(pipeline: Pipeline, project: Project):
 class PipelinesService:
     @staticmethod
     async def create_pipeline(pipeline: PipelinePostData, project: Project) -> Pipeline:
+        engine = await get_engine()
         pipeline_instance = Pipeline(**pipeline.dict(), project_id=project.id)
         pipeline_instance = await engine.save(pipeline_instance)
         return await engine.save(pipeline_instance)
 
     @staticmethod
     async def get_pipelines(project: Project) -> List[Pipeline]:
+        engine = await get_engine()
         pipeline = await engine.find(Pipeline, Pipeline.project_id == project.id)
         if not pipeline:
             raise HTTPException(404)
@@ -57,12 +60,14 @@ class PipelinesService:
 
     @staticmethod
     async def get_pipeline(id: ObjectId) -> List[Pipeline]:
+        engine = await get_engine()
         return await engine.find_one(Pipeline, Pipeline.id == id)
 
     @staticmethod
     async def delete_pipeline(pipeline: Pipeline):
         pipeline.deleted = True
-        engine.save(pipeline)
+        engine = await get_engine()
+        await engine.save(pipeline)
 
     @staticmethod
     async def update_pipeline(pipeline: Pipeline, data: Union[PipelinePatchData, PipelinePostData]) -> Pipeline:
@@ -75,6 +80,7 @@ class PipelinesService:
         if data.tags is not None:
             pipeline.tags = data.tags
 
+        engine = await get_engine()
         return await engine.save(pipeline)
 
     @staticmethod
@@ -88,10 +94,12 @@ class PipelinesService:
             finished_at=None,
             scheduled_by=None
         )
+        engine = await get_engine()
         return await engine.save(run)
 
     @staticmethod
     async def get_pipeline_runs(pipeline: Pipeline):
+        engine = await get_engine()
         return await engine.find(
             PipelineRun,
             PipelineRun.pipeline_id == pipeline.id,
@@ -100,6 +108,7 @@ class PipelinesService:
 
     @staticmethod
     async def get_pipeline_run(pipeline_run_id: ObjectId) -> PipelineRun:
+        engine = await get_engine()
         run = await engine.find_one(PipelineRun, PipelineRun.id == pipeline_run_id)
         if not run:
             raise HTTPException(404)

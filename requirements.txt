@@ -98,3 +98,4 @@ wrapt==1.14.0
 yarl==1.7.2
 zict==2.1.0
 zipp==3.4.0
+awscli-local

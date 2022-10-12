@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING
 
 from app.schema import ImageAnnotationsPostSchema, AnnotationsQueryResult,\
     PredictionPostData, CaptionPostData, ImageAnnotationsPatchSchema, ImageAnnotationsPutSchema
-from app.models import ImageAnnotations, Project, engine, Image, Prediction, Caption
+from app.models import ImageAnnotations, Project, get_engine, Image, Prediction, Caption
 from app.core.importers import DatasetImportFormat, import_dataset
 from app.core.query_engine.stages import STAGES, QueryStage, make_paginated_pipeline
 from app.services.projects import ProjectService
@@ -40,6 +40,7 @@ class AnnotationSortDirection(str, Enum):
 class AnnotationsService:
     @staticmethod
     async def get_annotations_by_event_id(event_id: str, project_id: ObjectId) -> ImageAnnotations:
+        engine = await get_engine()
         annotations = await engine.find_one(
             ImageAnnotations,
             (ImageAnnotations.project_id == project_id) & (ImageAnnotations.event_id == event_id))
@@ -56,6 +57,7 @@ class AnnotationsService:
                                            project_id: ObjectId) -> AnnotationsQueryResult:
         pipeline = [{'$match': {'project_id': project_id}}] + pipeline
         pipeline = make_paginated_pipeline(pipeline, page_size, page)
+        engine = await get_engine()
         collection = engine.get_collection(ImageAnnotations)
         result, *_ = await collection.aggregate(pipeline).to_list(length=None)
 
@@ -139,13 +141,14 @@ class AnnotationsService:
                 setattr(instance, attribute, new)
 
         instance.labels = instance.get_labels()
+        engine = await get_engine()
         return await engine.save(instance)
 
     @staticmethod
     async def add_annotations_bulk(annotations: List[ImageAnnotationsPostSchema],
                                    replace: bool, group: str, project_id: ObjectId) -> List[ImageAnnotations]:
         event_ids = [annotation.event_id for annotation in annotations]
-
+        engine = await get_engine()
         previous_instances = await engine.find(
             ImageAnnotations,
             ImageAnnotations.project_id == project_id,
@@ -187,6 +190,7 @@ class AnnotationsService:
 
     @staticmethod
     async def delete_annotations(annotations: ImageAnnotations, group: Optional[str]):
+        engine = await get_engine()
         if not group:
             await engine.delete(annotations)
         else:
