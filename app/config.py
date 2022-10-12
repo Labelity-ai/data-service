@@ -11,6 +11,8 @@ class TracingSampler(Enum):
 
 
 class Config:
+    DEBUG = os.environ.get('DEBUG', '').lower() == 'true'
+
     # Mongo Config
     MONGO_HOST = os.environ.get('MONGO_URI', 'mongodb://localhost:27017')
     MONGO_DATABASE = os.environ.get('MONGO_DATABASE', 'default_database')
@@ -19,6 +21,8 @@ class Config:
     AWS_ENDPOINT_URL = os.environ.get('AWS_ENDPOINT_URL')
 
     # Security Config
+    ADMIN_USER = os.environ.get('ADMIN_USER', 'admin')
+    ADMIN_API_KEY = os.environ.get('ADMIN_USER', '1234')
     SECRET_KEY = os.environ.get('SECRET_KEY', 'b308c184a53819197ae49b274ae10dcf0a590ee2659925fd440c918ce30f96ea')
     JWT_ALGORITHM = "HS512"
     FAST_TOKEN_JWT_ALGORITHM = "HS256"

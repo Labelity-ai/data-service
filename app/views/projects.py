@@ -7,8 +7,8 @@ from fastapi import Depends
 from odmantic import ObjectId
 
 from app.schema import ProjectPostSchema, ApiKey
-from app.models import Project, Label, User, TestUser
-from app.security import get_current_active_user
+from app.models import Project, Label, User
+from app.security import get_current_user
 from app.services.projects import ProjectService
 from app.core.tracing import traced
 
@@ -18,15 +18,10 @@ router = InferringRouter(
 )
 
 
-def testing_user():
-    return TestUser(id='602a2960ec631e386e1848a6')
-
-
 @traced
 @cbv(router)
 class ProjectsView:
-    # user: User = Depends(get_current_active_user)
-    user: TestUser = Depends(testing_user)
+    user: User = Depends(get_current_user)
 
     @router.get("/project/{id}")
     async def get_project_by_id(self, id: ObjectId) -> Project:

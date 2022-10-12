@@ -31,7 +31,7 @@ class DatasetsViewBase:
     @staticmethod
     async def get_datasets(project_id: ObjectId, name: str = None,
                            sort: DatasetGetSortQuery = None) -> List[Dataset]:
-        return await DatasetService.get_datasets(project_id, name, sort)
+        return await DatasetService.get_datasets(project_id, name, sort=sort)
 
     @staticmethod
     async def create_dataset(dataset: DatasetPostSchema, project_id: ObjectId) -> Dataset:

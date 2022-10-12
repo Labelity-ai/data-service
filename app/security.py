@@ -12,20 +12,26 @@ from app.models import User, get_engine, Project, ObjectId, FastToken
 
 API_KEY_NAME = 'X-API-Key'
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
-OAUTH2_SCHEME = OAuth2PasswordBearer(tokenUrl="token")
 OAUTH2_SCHEME_OPTIONAL = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
-
-
-async def _get_user(user_id: str):
-    engine = await get_engine()
-    return await engine.find_one(User, User.id == user_id)
-
 
 credentials_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Could not validate credentials",
     headers={"WWW-Authenticate": "Bearer"},
 )
+
+
+async def _get_user_by_id(user_id: str):
+    engine = await get_engine()
+    return await engine.find_one(User, User.id == user_id)
+
+
+async def _get_user_by_api_key(x_api_key: str):
+    engine = await get_engine()
+    user = await engine.find_one(User, {+User.api_keys: x_api_key})
+    if not user:
+        raise credentials_exception
+    return user
 
 
 async def get_dataset_token(token: str):
@@ -49,7 +55,7 @@ async def get_dataset_token(token: str):
     return token
 
 
-async def _get_current_user(token: str):
+async def _get_user_by_token(token: str):
     try:
         payload = jwt.decode(token, Config.SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
         user_id: str = payload.get("sub")
@@ -58,32 +64,31 @@ async def _get_current_user(token: str):
     except JWTError:
         raise credentials_exception
 
-    user = await _get_user(user_id=user_id)
+    user = await _get_user_by_id(user_id=user_id)
 
     if user is None:
         raise credentials_exception
 
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-
     return user
 
 
-async def get_current_user(token: str = Depends(OAUTH2_SCHEME)):
-    return await _get_current_user(token)
+async def get_current_user(token: str = Depends(OAUTH2_SCHEME_OPTIONAL),
+                           x_api_key: str = Depends(API_KEY_HEADER)):
+    if not x_api_key and not token:
+        raise credentials_exception
 
+    if token:
+        user = await _get_user_by_token(token)
+    else:
+        user = await _get_user_by_api_key(x_api_key)
 
-async def get_optional_current_user(token: str = Depends(OAUTH2_SCHEME_OPTIONAL)):
-    if not token:
-        return None
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User is inactive",
+        )
 
-    return _get_current_user(token)
-
-
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
-    if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
+    return user
 
 
 def create_fast_jwt_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -97,30 +102,20 @@ def create_fast_jwt_token(data: dict, expires_delta: Optional[timedelta] = None)
     return encoded_jwt
 
 
-async def get_project(x_api_key: str = Depends(API_KEY_HEADER),
-                      user: Optional[User] = Depends(get_optional_current_user),
-                      project_id: Optional[str] = Header(None)):
-    engine = await get_engine()
-    return await engine.find_one(Project, Project.id == ObjectId('602a2f0deac5ef687b30ac21'))
-
-    if user and project_id:
-        project = await engine.find_one(Project, Project.user_id == user.id)
-    elif x_api_key:
-        project = await engine.find_one(Project, {+Project.api_keys: x_api_key})
-    else:
-        project = None
-
-    if not project:
-        if x_api_key:
-            detail = 'Invalid API Key'
-        elif user and project_id:
-            detail = 'Invalid project_id Header'
-        else:
-            detail = 'Either API Key or JWT Token + project-id header should be specified'
-
+async def get_project(_: User = Depends(get_current_user), project_id: Optional[str] = Header(None)):
+    if not project_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail
+            detail='Invalid project_id header'
+        )
+
+    engine = await get_engine()
+    project = await engine.find_one(Project, Project.id == project_id)
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'Project with id {project_id} not found'
         )
 
     return project

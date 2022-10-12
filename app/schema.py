@@ -113,7 +113,7 @@ class ImageAnnotationsData(SchemaBase):
 
 class ProjectPostSchema(SchemaBase):
     name: str
-    description: str
+    description: str = ''
 
 
 class DatasetPostSchema(SchemaBase):

@@ -7,7 +7,7 @@ from app.schema import RevisionGetSortQuery, SortDirection, RevisionQueryResult,
     PostRevision, PatchRevision, RevisionChangesQueryResult, PostRevisionChange, PutRevisionChange, \
     PostPutRevisionComment
 from app.models import Project, Revision, User, RevisionChange, RevisionComment
-from app.security import get_project, get_current_active_user
+from app.security import get_project, get_current_user
 from app.services.revisions import RevisionsService
 from app.services.users import UsersService
 from app.core.tracing import traced
@@ -21,7 +21,7 @@ router = InferringRouter(
 @cbv(router)
 class RevisionsView:
     project: Project = Depends(get_project)
-    user: User = Depends(get_current_active_user)
+    user: User = Depends(get_current_user)
 
     @router.get("/revision")
     async def get_revision(self,
